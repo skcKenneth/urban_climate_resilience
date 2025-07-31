@@ -72,13 +72,13 @@ def main():
                 result['t'], result['y'], result['T_func'],
                 title=f"Epidemic Dynamics - {scenario_name.title()} Scenario"
             )
-            plt.savefig(f'epidemic_dynamics_{scenario_name}.png', dpi=300, bbox_inches='tight')
+            plt.savefig(f'figures/epidemic_dynamics_{scenario_name}.png', dpi=300, bbox_inches='tight')
             plt.close()
     
     # Phase portrait
     if len(results) > 0:
         fig = visualizer.plot_phase_portrait(results, ['I', 'k_avg'])
-        plt.savefig('phase_portrait.png', dpi=300, bbox_inches='tight')
+        plt.savefig('figures/phase_portrait.png', dpi=300, bbox_inches='tight')
         plt.close()
     
     # Task 3: Stability and bifurcation analysis
@@ -92,7 +92,7 @@ def main():
     # Plot bifurcation diagram
     if bifurcation_results['temperatures']:
         fig = visualizer.plot_bifurcation_diagram(bifurcation_results)
-        plt.savefig('bifurcation_diagram.png', dpi=300, bbox_inches='tight')
+        plt.savefig('figures/bifurcation_diagram.png', dpi=300, bbox_inches='tight')
         plt.close()
         
         # Find critical points
@@ -129,7 +129,7 @@ def main():
             
             # Visualize strategy comparison
             fig = visualizer.plot_control_strategies(strategy_comparison)
-            plt.savefig('control_strategies.png', dpi=300, bbox_inches='tight')
+            plt.savefig('figures/control_strategies.png', dpi=300, bbox_inches='tight')
             plt.close()
             
         except Exception as e:
@@ -146,7 +146,7 @@ def main():
         
         if sobol_results:
             fig = visualizer.plot_sensitivity_analysis(sobol_results)
-            plt.savefig('sensitivity_analysis.png', dpi=300, bbox_inches='tight')
+            plt.savefig('figures/sensitivity_analysis.png', dpi=300, bbox_inches='tight')
             plt.close()
             
             print("   Top sensitive parameters:")
@@ -171,7 +171,7 @@ def main():
             bounds = sensitivity_analyzer.calculate_uncertainty_bounds(mc_results)
             
             fig = visualizer.plot_uncertainty_analysis(mc_results, bounds)
-            plt.savefig('uncertainty_analysis.png', dpi=300, bbox_inches='tight')
+            plt.savefig('figures/uncertainty_analysis.png', dpi=300, bbox_inches='tight')
             plt.close()
             
             print("   Uncertainty bounds (95% CI):")

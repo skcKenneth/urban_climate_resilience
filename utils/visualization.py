@@ -52,7 +52,7 @@ class SystemVisualizer:
         ax2.grid(True, alpha=0.3)
         
         plt.tight_layout()
-        plt.savefig('epidemic_dynamics.png', dpi=300)
+        plt.savefig('figures/epidemic_dynamics.png', dpi=300)
         return fig
     
     def plot_phase_portrait(self, results_dict, variables=['I', 'k_avg']):
@@ -74,7 +74,7 @@ class SystemVisualizer:
         ax.legend()
         ax.grid(True, alpha=0.3)
         ax.set_title(f'Phase Portrait: {variables[0]} vs {variables[1]}')
-        plt.savefig('phase_portrait.png', dpi=300)
+        plt.savefig('figures/phase_portrait.png', dpi=300)
         return fig
     
     def plot_bifurcation_diagram(self, bifurcation_results):
@@ -121,7 +121,7 @@ class SystemVisualizer:
         ax1.legend(handles=[stable_patch, unstable_patch], loc='upper left')
         
         plt.tight_layout()
-        plt.savefig('bifurcation_diagram.png', dpi=300)
+        plt.savefig('figures/bifurcation_diagram.png', dpi=300)
         return fig
     
     def plot_control_strategies(self, strategy_results):
@@ -198,7 +198,7 @@ class SystemVisualizer:
         cbar.set_label('Normalized Values')
         
         plt.tight_layout()
-        plt.savefig('control_strategies.png', dpi=300)
+        plt.savefig('figures/control_strategies.png', dpi=300)
         return fig
     
     def plot_sensitivity_analysis(self, sobol_indices):
@@ -234,7 +234,7 @@ class SystemVisualizer:
                         bar.set_color('coral')
         
         plt.tight_layout()
-        plt.savefig('sensitivity_analysis.png', dpi=300)
+        plt.savefig('figures/sensitivity_analysis.png', dpi=300)
         return fig
     
     def plot_uncertainty_analysis(self, mc_results, bounds):
@@ -304,7 +304,7 @@ class SystemVisualizer:
         
         plt.colorbar(im, ax=axes[3])
         plt.tight_layout()
-        plt.savefig('uncertainty_analysis.png', dpi=300)
+        plt.savefig('figures/uncertainty_analysis.png', dpi=300)
         return fig
     
     def plot_network_evolution(self, G_initial, G_final, pos=None):
@@ -326,5 +326,5 @@ class SystemVisualizer:
         ax2.set_title(f'Final Network\nNodes: {G_final.number_of_nodes()}, '
                      f'Edges: {G_final.number_of_edges()}')
         plt.tight_layout()
-        plt.savefig('network_evolution.png', dpi=300)
+        plt.savefig('figures/network_evolution.png', dpi=300)
         return fig

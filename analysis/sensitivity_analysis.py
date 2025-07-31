@@ -2,7 +2,10 @@
 Sensitivity analysis and model validation
 """
 import numpy as np
-from scipy.stats import sobol_seq
+try:
+    from scipy.stats.qmc import Sobol  # For scipy >= 1.7
+except ImportError:
+    from scipy.stats import sobol_seq  # For older scipy versions
 import matplotlib.pyplot as plt
 from models.coupled_system import CoupledSystemModel
 from utils.parameters import ModelParameters
@@ -12,6 +15,23 @@ class SensitivityAnalysis:
     
     def __init__(self, params=None):
         self.params = params if params else ModelParameters()
+        
+    def generate_sobol_samples(self, n_params, n_samples):
+        """Generate Sobol sequence samples with version compatibility"""
+        try:
+            # For scipy >= 1.7
+            sampler = Sobol(d=n_params, scramble=True)
+            samples = sampler.random(n=n_samples)
+            return samples
+        except (NameError, ImportError):
+            # For older scipy versions
+            try:
+                samples = sobol_seq.i4_sobol_generate(n_params, n_samples)
+                return samples
+            except:
+                # Fallback to quasi-random
+                print("Warning: Using fallback pseudo-random instead of Sobol sequence")
+                return np.random.random((n_samples, n_params))
         
     def sobol_sensitivity_analysis(self, n_samples=1000, T_scenario='baseline'):
         """Perform Sobol sensitivity analysis"""
@@ -30,8 +50,8 @@ class SensitivityAnalysis:
         
         n_params = len(param_ranges)
         
-        # Generate Sobol sequence
-        sobol_points = sobol_seq.i4_sobol_generate(2 * n_params, n_samples)
+        # Generate Sobol sequence (or fallback)
+        sobol_points = self.generate_sobol_samples(2 * n_params, n_samples)
         
         # Scale to parameter ranges
         param_names = list(param_ranges.keys())
