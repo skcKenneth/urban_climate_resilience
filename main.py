@@ -6,21 +6,53 @@ import sys
 import argparse
 import signal
 import time
+import logging
+import traceback
 from contextlib import contextmanager
 from pathlib import Path
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler('analysis.log', mode='a')
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Set matplotlib backend before importing
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for headless environments
+logger.info(f"Matplotlib backend set to: {matplotlib.get_backend()}")
 
-import numpy as np
-import matplotlib.pyplot as plt
-from models.coupled_system import CoupledSystemModel
-from models.optimal_control import OptimalControlModel
-from analysis.stability_analysis import StabilityAnalysis
-from analysis.sensitivity_analysis import SensitivityAnalysis
-from utils.parameters import ModelParameters
-from utils.visualization import SystemVisualizer
-from utils.data_generator import DataGenerator
+# Import with error handling
+try:
+    import numpy as np
+    import matplotlib.pyplot as plt
+    logger.info(f"NumPy version: {np.__version__}")
+    logger.info(f"Matplotlib version: {matplotlib.__version__}")
+except ImportError as e:
+    logger.error(f"Failed to import required packages: {e}")
+    sys.exit(1)
+
+# Import local modules with error handling
+try:
+    from models.coupled_system import CoupledSystemModel
+    from models.optimal_control import OptimalControlModel
+    from analysis.stability_analysis import StabilityAnalysis
+    from analysis.sensitivity_analysis import SensitivityAnalysis
+    from utils.parameters import ModelParameters
+    from utils.visualization import SystemVisualizer
+    from utils.data_generator import DataGenerator
+    logger.info("Successfully imported all local modules")
+except ImportError as e:
+    logger.error(f"Failed to import local modules: {e}")
+    logger.error(f"Current working directory: {os.getcwd()}")
+    logger.error(f"Python path: {sys.path}")
+    logger.error(traceback.format_exc())
+    sys.exit(1)
 
 
 @contextmanager
@@ -53,185 +85,185 @@ def run_analysis(analysis_type='full', quick_mode=False, parallel=False, output_
         parallel: Whether to use parallel processing
         output_dir: Directory for output files
     """
-    print("=" * 60)
-    print(f"Urban Climate-Social Network Resilience System")
-    print(f"Analysis Type: {analysis_type} | Quick Mode: {quick_mode} | Parallel: {parallel}")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info(f"Urban Climate-Social Network Resilience System")
+    logger.info(f"Analysis Type: {analysis_type} | Quick Mode: {quick_mode} | Parallel: {parallel}")
+    logger.info("=" * 60)
     
-    # Create output directory
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    
-    # Configure parameters based on mode
-    if quick_mode or os.getenv('QUICK_MODE', 'false').lower() == 'true':
-        days = int(os.getenv('SIMULATION_DAYS', '90'))
-        samples = int(os.getenv('N_SAMPLES', '50'))
-        population = 5000
-        print(f"Quick mode: {days} days, {samples} samples, {population} population")
-    else:
-        days = int(os.getenv('SIMULATION_DAYS', '365'))
-        samples = int(os.getenv('N_SAMPLES', '500'))
-        population = 10000
-    
-    # Configure scenarios
-    baseline_params = ModelParameters()
-    baseline_params.N = population
-    
-    heatwave_params = ModelParameters()
-    heatwave_params.N = population
-    heatwave_params.T_0 = 30.0  # Higher reference temperature
-    heatwave_params.H_0 = 0.8   # Higher humidity
-    
-    extreme_params = ModelParameters()
-    extreme_params.N = population
-    extreme_params.T_0 = 35.0   # Extreme temperature
-    extreme_params.H_0 = 0.9    # Extreme humidity
-    extreme_params.T_critical = 40.0  # Higher critical threshold
-    
-    scenarios = {
-        'baseline': baseline_params,
-        'heatwave': heatwave_params,
-        'extreme': extreme_params
-    }
-    
-    # Determine which scenarios to run
-    if analysis_type == 'quick':
-        scenarios_to_run = ['baseline']
-    elif analysis_type in scenarios:
-        scenarios_to_run = [analysis_type]
-    else:  # full analysis
-        scenarios_to_run = list(scenarios.keys())
-    
-    # Initialize components
-    generator = DataGenerator()
-    visualizer = SystemVisualizer()
-    
-    # Store results
-    all_results = {}
-    
-    # Run simulations for each scenario
-    for scenario_name in scenarios_to_run:
-        print(f"\nProcessing {scenario_name} scenario...")
-        params = scenarios[scenario_name]
+    try:
+        # Create output directory
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        logger.info(f"Output directory created/verified: {output_dir}")
         
-        try:
-            with timeout_context(int(os.getenv('MAX_TIME', '3600'))):
-                # Generate time-varying parameters
-                t = np.linspace(0, days, days)
-                temp_data, humidity_data = generator.generate_climate_scenario(
-                    scenario_type=scenario_name,
-                    days=days
+        # Configure parameters based on mode
+        if quick_mode or os.getenv('QUICK_MODE', 'false').lower() == 'true':
+            days = int(os.getenv('SIMULATION_DAYS', '90'))
+            samples = int(os.getenv('N_SAMPLES', '50'))
+            population = 5000
+            logger.info(f"Quick mode: {days} days, {samples} samples, {population} population")
+        else:
+            days = int(os.getenv('SIMULATION_DAYS', '365'))
+            samples = int(os.getenv('N_SAMPLES', '500'))
+            population = 10000
+        
+        # Configure scenarios
+        baseline_params = ModelParameters()
+        baseline_params.N = population
+        
+        heatwave_params = ModelParameters()
+        heatwave_params.N = population
+        heatwave_params.T_0 = 30.0  # Higher reference temperature
+        heatwave_params.H_0 = 0.8   # Higher humidity
+        
+        extreme_params = ModelParameters()
+        extreme_params.N = population
+        extreme_params.T_0 = 35.0   # Extreme temperature
+        extreme_params.H_0 = 0.9    # Extreme humidity
+        extreme_params.T_critical = 40.0  # Higher critical threshold
+        
+        scenarios = {
+            'baseline': baseline_params,
+            'heatwave': heatwave_params,
+            'extreme': extreme_params
+        }
+        
+        # Determine which scenarios to run
+        if analysis_type == 'quick':
+            scenarios_to_run = ['baseline']
+        elif analysis_type in scenarios:
+            scenarios_to_run = [analysis_type]
+        elif analysis_type == 'full':
+            scenarios_to_run = list(scenarios.keys())
+        else:
+            logger.error(f"Unknown analysis type: {analysis_type}")
+            raise ValueError(f"Unknown analysis type: {analysis_type}")
+        
+        logger.info(f"Running scenarios: {scenarios_to_run}")
+        
+        # Initialize visualizer
+        viz = SystemVisualizer(output_dir=output_dir)
+        
+        # Run analyses
+        results = {}
+        for scenario_name in scenarios_to_run:
+            logger.info(f"\n{'='*50}")
+            logger.info(f"Running {scenario_name} scenario...")
+            logger.info(f"{'='*50}")
+            
+            try:
+                params = scenarios[scenario_name]
+                
+                # Generate synthetic data
+                logger.info("Generating synthetic data...")
+                data_gen = DataGenerator(params)
+                climate_data, network_data = data_gen.generate_synthetic_data(
+                    days=days,
+                    save_path=Path(output_dir) / f"{scenario_name}_data.npz"
                 )
                 
-                # Create and run coupled model
-                model = CoupledSystemModel(params)
+                # Initialize models
+                logger.info("Initializing coupled system model...")
+                model = CoupledSystemModel(params, climate_data, network_data)
                 
-                # Create interpolation functions for temperature and humidity
-                T_func = lambda time: np.interp(time, t, temp_data)
-                H_func = lambda time: np.interp(time, t, humidity_data)
-                
-                # Initial conditions: [S, E, I, R, k_avg, C]
-                y0 = [params.N * 0.99, 0, params.N * 0.01, 0, params.k_0, 0.3]
-                
-                # Solve the coupled system
-                time_points, state = model.solve_coupled_system(
-                    t_span=(0, days),
-                    y0=y0,
-                    T_func=T_func,
-                    H_func=H_func,
-                    t_eval=t
-                )
+                # Run simulation
+                logger.info(f"Running simulation for {days} days...")
+                t_span = (0, days)
+                result = model.simulate(t_span, method='RK45')
                 
                 # Store results
-                S, E, I, R, k_avg, C = state
-                all_results[scenario_name] = {
-                    'time': time_points,
-                    'epidemic': {'S': S, 'E': E, 'I': I, 'R': R},
-                    'network': {'k_avg': k_avg, 'C': C},
-                    'temperature': temp_data,
-                    'humidity': humidity_data,
+                results[scenario_name] = {
+                    'model': model,
+                    'simulation': result,
                     'params': params,
-                    'state': state
+                    'climate_data': climate_data,
+                    'network_data': network_data
                 }
+                
+                # Perform analyses
+                if not quick_mode or analysis_type != 'quick':
+                    # Stability analysis
+                    logger.info("Performing stability analysis...")
+                    stability = StabilityAnalysis(model)
+                    stability_results = stability.analyze_equilibrium(result.y[:, -1])
+                    results[scenario_name]['stability'] = stability_results
+                    
+                    # Sensitivity analysis
+                    logger.info("Performing sensitivity analysis...")
+                    sensitivity = SensitivityAnalysis(model)
+                    sensitivity_results = sensitivity.morris_screening(n_samples=samples)
+                    results[scenario_name]['sensitivity'] = sensitivity_results
                 
                 # Generate visualizations
-                print(f"  Generating visualizations for {scenario_name}...")
-                fig = visualizer.plot_epidemic_dynamics(
-                    time_points, 
-                    state,
-                    T_func,
-                    title=f"Epidemic Dynamics - {scenario_name}"
+                logger.info("Generating visualizations...")
+                viz.plot_simulation_results(
+                    result, model, 
+                    title=f"{scenario_name.capitalize()} Scenario",
+                    save_name=f"{scenario_name}_simulation"
                 )
-                fig.savefig(f"{output_dir}/epidemic_{scenario_name}.png", dpi=150, bbox_inches='tight')
-                plt.close(fig)
                 
-        except TimeoutError:
-            print(f"  Timeout reached for {scenario_name} scenario")
-        except Exception as e:
-            print(f"  Error in {scenario_name} scenario: {e}")
-    
-    # Run additional analyses if not in quick mode
-    if not quick_mode and analysis_type in ['full', 'baseline']:
-        try:
-            # Stability analysis
-            print("\nPerforming stability analysis...")
-            stability = StabilityAnalysis(scenarios['baseline'])
-            
-            # Phase portrait using baseline results
-            if 'baseline' in all_results and all_results['baseline'] is not None:
-                # Convert our result format to what plot_phase_portrait expects
-                phase_portrait_data = {
-                    'baseline': {
-                        'y': all_results['baseline']['state']  # state contains [S, E, I, R, k_avg, C]
-                    }
-                }
-                fig = visualizer.plot_phase_portrait(
-                    phase_portrait_data,
-                    variables=['I', 'k_avg']
-                )
-                fig.savefig(f"{output_dir}/phase_portrait.png", dpi=150, bbox_inches='tight')
-                plt.close(fig)
-            
-            # Bifurcation analysis
-            bifurcation_results = stability.bifurcation_analysis_temperature(
-                T_range=np.linspace(15, 40, 20 if quick_mode else 50)
-            )
-            fig = visualizer.plot_bifurcation_diagram(bifurcation_results)
-            fig.savefig(f"{output_dir}/bifurcation_diagram.png", dpi=150, bbox_inches='tight')
-            plt.close(fig)
-            
-            # Sensitivity analysis (reduced for quick mode)
-            if parallel:
-                print("\nPerforming parallel sensitivity analysis...")
-                from parallel_analysis import ParallelAnalysis
-                parallel_analyzer = ParallelAnalysis(scenarios['baseline'])
-                sensitivity_results = parallel_analyzer.run_sensitivity_analysis(
-                    n_samples=samples
-                )
+                if 'stability' in results[scenario_name]:
+                    viz.plot_stability_analysis(
+                        stability_results,
+                        save_name=f"{scenario_name}_stability"
+                    )
+                
+                if 'sensitivity' in results[scenario_name]:
+                    viz.plot_sensitivity_results(
+                        sensitivity_results,
+                        save_name=f"{scenario_name}_sensitivity"
+                    )
+                
+                logger.info(f"✅ {scenario_name} scenario completed successfully")
+                
+            except Exception as e:
+                logger.error(f"Error in {scenario_name} scenario: {e}")
+                logger.error(traceback.format_exc())
+                results[scenario_name] = {'error': str(e)}
+        
+        # Generate comparison plots if multiple scenarios
+        if len(results) > 1 and not quick_mode:
+            logger.info("\nGenerating comparison plots...")
+            try:
+                viz.compare_scenarios(results)
+            except Exception as e:
+                logger.error(f"Error generating comparison plots: {e}")
+        
+        # Summary report
+        logger.info("\n" + "="*60)
+        logger.info("ANALYSIS SUMMARY")
+        logger.info("="*60)
+        
+        for scenario, result in results.items():
+            if 'error' in result:
+                logger.info(f"{scenario}: ❌ Failed - {result['error']}")
             else:
-                print("\nPerforming sensitivity analysis...")
-                sensitivity = SensitivityAnalysis(scenarios['baseline'])
-                sensitivity_results = sensitivity.sobol_sensitivity_analysis(
-                    n_samples=samples,
-                    T_scenario='baseline'
-                )
-            
-            if sensitivity_results:
-                fig = visualizer.plot_sensitivity_analysis(sensitivity_results)
-                fig.savefig(f"{output_dir}/sensitivity_analysis.png", dpi=150, bbox_inches='tight')
-                plt.close(fig)
-            
-        except Exception as e:
-            import traceback
-            print(f"Error in additional analyses: {e}")
-            print("Traceback:")
-            traceback.print_exc()
-    
-    print("\n" + "=" * 60)
-    print("Analysis complete!")
-    print(f"Results saved to: {output_dir}/")
-    print("=" * 60)
-    
-    return all_results
+                logger.info(f"{scenario}: ✅ Completed")
+        
+        # Save summary
+        summary_path = Path(output_dir) / "analysis_summary.txt"
+        with open(summary_path, 'w') as f:
+            f.write("Urban Climate Resilience Analysis Summary\n")
+            f.write("="*50 + "\n")
+            f.write(f"Analysis Type: {analysis_type}\n")
+            f.write(f"Quick Mode: {quick_mode}\n")
+            f.write(f"Output Directory: {output_dir}\n")
+            f.write(f"Scenarios Run: {', '.join(scenarios_to_run)}\n")
+            f.write("\nResults:\n")
+            for scenario, result in results.items():
+                if 'error' in result:
+                    f.write(f"  {scenario}: Failed - {result['error']}\n")
+                else:
+                    f.write(f"  {scenario}: Completed successfully\n")
+        
+        logger.info(f"\nSummary saved to: {summary_path}")
+        logger.info("Analysis complete!")
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Critical error in analysis: {e}")
+        logger.error(traceback.format_exc())
+        raise
 
 
 def main():
