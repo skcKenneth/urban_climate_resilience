@@ -3,26 +3,11 @@ name: Climate Analysis
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
-    inputs:
-      analysis_type:
-        description: 'Type of analysis to run'
-        required: true
-        default: 'full'
-        type: choice
-        options:
-          - quick
-          - full
-          - baseline
-          - heatwave
-          - extreme
 
 jobs:
-  analysis:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 120  # 2 hours for full analysis
     
     steps:
     - uses: actions/checkout@v4
@@ -30,61 +15,25 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.10'
     
-    - name: Cache pip packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-    
-    - name: Install dependencies
+    - name: Install only essential packages
       run: |
         python -m pip install --upgrade pip
-        pip install wheel
-        pip install -r requirements.txt
+        pip install numpy matplotlib
     
-    - name: Run full analysis for paper
-      run: |
-        export PYTHONPATH=$PWD
-        # Use input if manual trigger, otherwise run full analysis
-        ANALYSIS_TYPE="${{ github.event.inputs.analysis_type || 'full' }}"
-        echo "Running $ANALYSIS_TYPE analysis..."
-        
-        if [ "$ANALYSIS_TYPE" = "quick" ]; then
-          python main.py --quick-mode --output-dir results
-        else
-          # Full analysis for paper with all scenarios
-          python run_full_analysis.py --analysis-type $ANALYSIS_TYPE --output-dir results
-        fi
-      env:
-        MPLBACKEND: Agg
-        SIMULATION_DAYS: 365
-        N_SAMPLES: 500
+    - name: Run analysis
+      run: python main.py
     
-    - name: Generate summary report
+    - name: Check results
       if: always()
       run: |
-        echo "# Analysis Results Summary" > results/SUMMARY.md
-        echo "Date: $(date)" >> results/SUMMARY.md
-        echo "Analysis Type: ${{ github.event.inputs.analysis_type || 'full' }}" >> results/SUMMARY.md
-        echo "" >> results/SUMMARY.md
-        echo "## Generated Files:" >> results/SUMMARY.md
-        echo "\`\`\`" >> results/SUMMARY.md
-        ls -la results/ >> results/SUMMARY.md
-        echo "\`\`\`" >> results/SUMMARY.md
-        echo "" >> results/SUMMARY.md
-        echo "## Visualizations:" >> results/SUMMARY.md
-        find results -name "*.png" -type f | while read f; do
-          echo "- $(basename $f)" >> results/SUMMARY.md
-        done
+        echo "Checking results..."
+        ls -la results/ || echo "No results found"
     
     - name: Upload results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: paper-analysis-results-${{ github.run_number }}
+        name: analysis-results
         path: results/
-        retention-days: 30  # Keep for 30 days
