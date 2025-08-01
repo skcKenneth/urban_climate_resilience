@@ -2,46 +2,56 @@ name: Urban Climate Resilience Analysis
 
 on:
   schedule:
-    # Run daily at 2 AM UTC (adjust for your timezone)
+    # Run daily at 2 AM UTC
     - cron: '0 2 * * *'
-  # Also allow manual triggers
   workflow_dispatch:
-  # Run on pushes to main branch
   push:
     branches: [ main ]
     paths:
       - '**.py'
       - 'requirements.txt'
+      - '.github/workflows/**'
 
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
 
 jobs:
-  # Parallel job for dependency caching
-  cache-dependencies:
+  # Quick test to ensure basic functionality
+  test:
     runs-on: ubuntu-latest
-    outputs:
-      cache-key: ${{ steps.cache-key.outputs.value }}
+    timeout-minutes: 10
     steps:
-      - name: Generate cache key
-        id: cache-key
-        run: |
-          echo "value=${{ hashFiles('requirements.txt') }}-${{ github.sha }}" >> $GITHUB_OUTPUT
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run quick test
+      run: python test_quick_run.py
+      env:
+        MPLBACKEND: Agg
+        QUICK_MODE: true
 
-  # Parallel analysis jobs
-  climate-analysis-baseline:
-    needs: cache-dependencies
+  # Main analysis job
+  analysis:
+    needs: test
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        scenario: ['baseline', 'heatwave', 'extreme']
+      fail-fast: false
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 1
+    - uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -52,594 +62,131 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential gfortran libopenblas-dev libatlas-base-dev liblapack-dev
-        sudo apt-get remove -y fonts-noto-color-emoji || true
-    
-    - name: Cache pip dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ needs.cache-dependencies.outputs.cache-key }}
-        restore-keys: |
-          ${{ needs.cache-dependencies.outputs.cache-key }}
-          ${{ hashFiles('requirements.txt') }}-
+        sudo apt-get install -y build-essential gfortran libopenblas-dev
     
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
-        pip install --no-cache-dir -r requirements.txt
-        pip install psutil memory-profiler joblib
+        pip install -r requirements.txt
+        pip install psutil memory-profiler
     
     - name: Create results directory
       run: |
-        mkdir -p results/$(date +%Y-%m-%d)
-        echo "RESULTS_DIR=results/$(date +%Y-%m-%d)" >> $GITHUB_ENV
+        mkdir -p results/${{ matrix.scenario }}
+        echo "RESULTS_DIR=results/${{ matrix.scenario }}" >> $GITHUB_ENV
     
-    - name: Run baseline analysis
+    - name: Run ${{ matrix.scenario }} analysis
       run: |
-        export MPLBACKEND=Agg
-        export MPLCONFIGDIR=/tmp
-        export OMP_NUM_THREADS=2
-        export MKL_NUM_THREADS=2
-        export OPENBLAS_NUM_THREADS=2
-        export VECLIB_MAXIMUM_THREADS=2
-        export PYTHONMALLOC=malloc
-        export PYTHONUNBUFFERED=1
-        
-        python auto_run.py --analysis-type baseline 2>&1 | tee ${{ env.RESULTS_DIR }}/baseline_log.txt
+        python main.py \
+          --analysis-type ${{ matrix.scenario }} \
+          --output-dir ${{ env.RESULTS_DIR }}
       env:
-        GITHUB_ACTIONS: true
-        PYTHONPATH: ${{ github.workspace }}
-        QUICK_MODE: false
-        MAX_TIME: 3600
-        N_SAMPLES: 500
-        SIMULATION_DAYS: 365
-      timeout-minutes: 60
+        MPLBACKEND: Agg
+        PYTHONUNBUFFERED: 1
+        OMP_NUM_THREADS: 2
+        MAX_TIME: 1800
+        N_SAMPLES: 200
+        SIMULATION_DAYS: 180
     
-    - name: Generate visualizations
-      if: always()
-      run: |
-        # Ensure figures directory exists
-        mkdir -p figures/publication
-        
-        # List generated figures
-        echo "Generated figures:"
-        find figures/ -name "*.png" -o -name "*.pdf" | sort
-        
-        # Copy all figures to results directory
-        cp -r figures/ ${{ env.RESULTS_DIR }}/
-    
-    - name: Create analysis summary
-      if: always()
-      run: |
-        # Create analysis summary JSON
-        cat > ${{ env.RESULTS_DIR }}/baseline_summary.json << EOF
-        {
-          "analysis_type": "baseline",
-          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-          "run_number": "${{ github.run_number }}",
-          "commit": "${{ github.sha }}",
-          "status": "${{ job.status }}",
-          "figures": $(find ${{ env.RESULTS_DIR }}/figures -name "*.png" -o -name "*.pdf" | jq -R -s -c 'split("\n")[:-1]')
-        }
-        EOF
-    
-    - name: Upload baseline results
+    - name: Upload results
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: baseline-analysis-${{ github.run_number }}
-        path: |
-          results/
-          figures/
+        name: results-${{ matrix.scenario }}
+        path: ${{ env.RESULTS_DIR }}
         retention-days: 30
-        compression-level: 6
 
-  climate-analysis-sensitivity:
-    needs: cache-dependencies
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 1
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'
-    
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential gfortran libopenblas-dev libatlas-base-dev liblapack-dev
-        sudo apt-get remove -y fonts-noto-color-emoji || true
-    
-    - name: Cache pip dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ needs.cache-dependencies.outputs.cache-key }}
-        restore-keys: |
-          ${{ needs.cache-dependencies.outputs.cache-key }}
-          ${{ hashFiles('requirements.txt') }}-
-    
-    - name: Install Python dependencies
-      run: |
-        pip install --upgrade pip
-        pip install --no-cache-dir -r requirements.txt
-        pip install psutil memory-profiler joblib
-    
-    - name: Create results directory
-      run: |
-        mkdir -p results/$(date +%Y-%m-%d)
-        echo "RESULTS_DIR=results/$(date +%Y-%m-%d)" >> $GITHUB_ENV
-    
-    - name: Run sensitivity analysis
-      run: |
-        export MPLBACKEND=Agg
-        export MPLCONFIGDIR=/tmp
-        export OMP_NUM_THREADS=2
-        export MKL_NUM_THREADS=2
-        export OPENBLAS_NUM_THREADS=2
-        export VECLIB_MAXIMUM_THREADS=2
-        export PYTHONMALLOC=malloc
-        export PYTHONUNBUFFERED=1
-        
-        python auto_run.py --analysis-type sensitivity 2>&1 | tee ${{ env.RESULTS_DIR }}/sensitivity_log.txt
-      env:
-        GITHUB_ACTIONS: true
-        PYTHONPATH: ${{ github.workspace }}
-        QUICK_MODE: false
-        MAX_TIME: 3600
-        N_SAMPLES: 1000
-        SIMULATION_DAYS: 365
-      timeout-minutes: 60
-    
-    - name: Generate visualizations
-      if: always()
-      run: |
-        # Ensure figures directory exists
-        mkdir -p figures/publication
-        
-        # List generated figures
-        echo "Generated figures:"
-        find figures/ -name "*.png" -o -name "*.pdf" | sort
-        
-        # Copy all figures to results directory
-        cp -r figures/ ${{ env.RESULTS_DIR }}/
-    
-    - name: Create analysis summary
-      if: always()
-      run: |
-        # Create analysis summary JSON
-        cat > ${{ env.RESULTS_DIR }}/sensitivity_summary.json << EOF
-        {
-          "analysis_type": "sensitivity",
-          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-          "run_number": "${{ github.run_number }}",
-          "commit": "${{ github.sha }}",
-          "status": "${{ job.status }}",
-          "figures": $(find ${{ env.RESULTS_DIR }}/figures -name "*.png" -o -name "*.pdf" | jq -R -s -c 'split("\n")[:-1]')
-        }
-        EOF
-    
-    - name: Upload sensitivity results
-      uses: actions/upload-artifact@v4
-      with:
-        name: sensitivity-analysis-${{ github.run_number }}
-        path: |
-          results/
-          figures/
-        retention-days: 30
-        compression-level: 6
-
-  climate-analysis-uncertainty:
-    needs: cache-dependencies
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 1
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'
-    
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential gfortran libopenblas-dev libatlas-base-dev liblapack-dev
-        sudo apt-get remove -y fonts-noto-color-emoji || true
-    
-    - name: Cache pip dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ needs.cache-dependencies.outputs.cache-key }}
-        restore-keys: |
-          ${{ needs.cache-dependencies.outputs.cache-key }}
-          ${{ hashFiles('requirements.txt') }}-
-    
-    - name: Install Python dependencies
-      run: |
-        pip install --upgrade pip
-        pip install --no-cache-dir -r requirements.txt
-        pip install psutil memory-profiler joblib
-    
-    - name: Create results directory
-      run: |
-        mkdir -p results/$(date +%Y-%m-%d)
-        echo "RESULTS_DIR=results/$(date +%Y-%m-%d)" >> $GITHUB_ENV
-    
-    - name: Run uncertainty analysis
-      run: |
-        export MPLBACKEND=Agg
-        export MPLCONFIGDIR=/tmp
-        export OMP_NUM_THREADS=2
-        export MKL_NUM_THREADS=2
-        export OPENBLAS_NUM_THREADS=2
-        export VECLIB_MAXIMUM_THREADS=2
-        export PYTHONMALLOC=malloc
-        export PYTHONUNBUFFERED=1
-        
-        python auto_run.py --analysis-type uncertainty 2>&1 | tee ${{ env.RESULTS_DIR }}/uncertainty_log.txt
-      env:
-        GITHUB_ACTIONS: true
-        PYTHONPATH: ${{ github.workspace }}
-        QUICK_MODE: false
-        MAX_TIME: 3600
-        N_SAMPLES: 800
-        SIMULATION_DAYS: 365
-      timeout-minutes: 60
-    
-    - name: Generate visualizations
-      if: always()
-      run: |
-        # Ensure figures directory exists
-        mkdir -p figures/publication
-        
-        # List generated figures
-        echo "Generated figures:"
-        find figures/ -name "*.png" -o -name "*.pdf" | sort
-        
-        # Copy all figures to results directory
-        cp -r figures/ ${{ env.RESULTS_DIR }}/
-    
-    - name: Create analysis summary
-      if: always()
-      run: |
-        # Create analysis summary JSON
-        cat > ${{ env.RESULTS_DIR }}/uncertainty_summary.json << EOF
-        {
-          "analysis_type": "uncertainty",
-          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-          "run_number": "${{ github.run_number }}",
-          "commit": "${{ github.sha }}",
-          "status": "${{ job.status }}",
-          "figures": $(find ${{ env.RESULTS_DIR }}/figures -name "*.png" -o -name "*.pdf" | jq -R -s -c 'split("\n")[:-1]')
-        }
-        EOF
-    
-    - name: Upload uncertainty results
-      uses: actions/upload-artifact@v4
-      with:
-        name: uncertainty-analysis-${{ github.run_number }}
-        path: |
-          results/
-          figures/
-        retention-days: 30
-        compression-level: 6
-
-  climate-analysis-control:
-    needs: cache-dependencies
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 1
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'
-    
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential gfortran libopenblas-dev libatlas-base-dev liblapack-dev
-        sudo apt-get remove -y fonts-noto-color-emoji || true
-    
-    - name: Cache pip dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ needs.cache-dependencies.outputs.cache-key }}
-        restore-keys: |
-          ${{ needs.cache-dependencies.outputs.cache-key }}
-          ${{ hashFiles('requirements.txt') }}-
-    
-    - name: Install Python dependencies
-      run: |
-        pip install --upgrade pip
-        pip install --no-cache-dir -r requirements.txt
-        pip install psutil memory-profiler joblib
-    
-    - name: Create results directory
-      run: |
-        mkdir -p results/$(date +%Y-%m-%d)
-        echo "RESULTS_DIR=results/$(date +%Y-%m-%d)" >> $GITHUB_ENV
-    
-    - name: Run optimal control analysis
-      run: |
-        export MPLBACKEND=Agg
-        export MPLCONFIGDIR=/tmp
-        export OMP_NUM_THREADS=2
-        export MKL_NUM_THREADS=2
-        export OPENBLAS_NUM_THREADS=2
-        export VECLIB_MAXIMUM_THREADS=2
-        export PYTHONMALLOC=malloc
-        export PYTHONUNBUFFERED=1
-        
-        python auto_run.py --analysis-type control 2>&1 | tee ${{ env.RESULTS_DIR }}/control_log.txt
-      env:
-        GITHUB_ACTIONS: true
-        PYTHONPATH: ${{ github.workspace }}
-        QUICK_MODE: false
-        MAX_TIME: 3600
-        N_SAMPLES: 300
-        SIMULATION_DAYS: 365
-      timeout-minutes: 60
-    
-    - name: Generate visualizations
-      if: always()
-      run: |
-        # Ensure figures directory exists
-        mkdir -p figures/publication
-        
-        # List generated figures
-        echo "Generated figures:"
-        find figures/ -name "*.png" -o -name "*.pdf" | sort
-        
-        # Copy all figures to results directory
-        cp -r figures/ ${{ env.RESULTS_DIR }}/
-    
-    - name: Create analysis summary
-      if: always()
-      run: |
-        # Create analysis summary JSON
-        cat > ${{ env.RESULTS_DIR }}/control_summary.json << EOF
-        {
-          "analysis_type": "control",
-          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-          "run_number": "${{ github.run_number }}",
-          "commit": "${{ github.sha }}",
-          "status": "${{ job.status }}",
-          "figures": $(find ${{ env.RESULTS_DIR }}/figures -name "*.png" -o -name "*.pdf" | jq -R -s -c 'split("\n")[:-1]')
-        }
-        EOF
-    
-    - name: Upload control results
-      uses: actions/upload-artifact@v4
-      with:
-        name: control-analysis-${{ github.run_number }}
-        path: |
-          results/
-          figures/
-        retention-days: 30
-        compression-level: 6
-
-  # Combine results job
-  combine-results:
-    needs: [climate-analysis-baseline, climate-analysis-sensitivity, 
-            climate-analysis-uncertainty, climate-analysis-control]
+  # Combine results and generate report
+  report:
+    needs: analysis
     runs-on: ubuntu-latest
     if: always()
-    
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/checkout@v4
     
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
-        path: artifacts
+        path: combined_results
     
-    - name: Combine results
+    - name: Generate summary report
       run: |
-        mkdir -p combined_results/$(date +%Y-%m-%d)/{data,figures,logs}
+        echo "# Climate Resilience Analysis Report" > REPORT.md
+        echo "Generated on: $(date)" >> REPORT.md
+        echo "" >> REPORT.md
         
-        # Copy all data files
-        find artifacts/ -name "*.json" -exec cp {} combined_results/$(date +%Y-%m-%d)/data/ \;
-        find artifacts/ -name "*.csv" -exec cp {} combined_results/$(date +%Y-%m-%d)/data/ \;
-        find artifacts/ -name "*.pkl" -exec cp {} combined_results/$(date +%Y-%m-%d)/data/ \;
+        for scenario in baseline heatwave extreme; do
+          if [ -d "combined_results/results-$scenario" ]; then
+            echo "## $scenario Scenario" >> REPORT.md
+            echo "- ✅ Analysis completed" >> REPORT.md
+            ls -la combined_results/results-$scenario/*.png 2>/dev/null | wc -l | xargs -I {} echo "- {} visualizations generated" >> REPORT.md
+            echo "" >> REPORT.md
+          else
+            echo "## $scenario Scenario" >> REPORT.md
+            echo "- ❌ Analysis failed or incomplete" >> REPORT.md
+            echo "" >> REPORT.md
+          fi
+        done
         
-        # Copy all log files
-        find artifacts/ -name "*.txt" -exec cp {} combined_results/$(date +%Y-%m-%d)/logs/ \;
-        
-        # Copy all figures
-        find artifacts/ -name "*.png" -exec cp {} combined_results/$(date +%Y-%m-%d)/figures/ \;
-        find artifacts/ -name "*.pdf" -exec cp {} combined_results/$(date +%Y-%m-%d)/figures/ \;
-        
-        # Create comprehensive summary report
-        cat > combined_results/$(date +%Y-%m-%d)/README.md << EOF
-        # Combined Climate Analysis Results - $(date)
-        
-        ## Summary
-        
-        This directory contains the complete results from the automated climate-epidemic analysis run.
-        
-        ## Analysis Components
-        
-        ### 1. Baseline System Analysis
-        - Status: ${{ needs.climate-analysis-baseline.result }}
-        - Focus: Core system dynamics without interventions
-        
-        ### 2. Sensitivity Analysis  
-        - Status: ${{ needs.climate-analysis-sensitivity.result }}
-        - Focus: Parameter sensitivity and system robustness
-        
-        ### 3. Uncertainty Quantification
-        - Status: ${{ needs.climate-analysis-uncertainty.result }}
-        - Focus: Monte Carlo uncertainty analysis
-        
-        ### 4. Optimal Control Analysis
-        - Status: ${{ needs.climate-analysis-control.result }}
-        - Focus: Optimal resource allocation strategies
-        
-        ## Directory Structure
-        
-        \`\`\`
-        $(date +%Y-%m-%d)/
-        ├── data/          # Analysis results in JSON/CSV format
-        ├── figures/       # All generated visualizations
-        └── logs/          # Execution logs
-        \`\`\`
-        
-        ## Key Visualizations
-        
-        ### Control Strategy Comparison
-        ![Strategy Dashboard](figures/strategy_dashboard.png)
-        
-        ### Optimal Control Trajectories
-        ![Control Trajectories](figures/control_trajectories.png)
-        
-        ### 3D Phase Space
-        ![Phase Space](figures/phase_space_3d.png)
-        
-        ### Sensitivity Analysis
-        ![Sensitivity Heatmap](figures/sensitivity_heatmap.png)
-        
-        ### Uncertainty Analysis
-        ![Uncertainty Bands](figures/uncertainty_bands.png)
-        
-        ## Run Information
-        - Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-        - Run Number: ${{ github.run_number }}
-        - Commit: ${{ github.sha }}
-        - Triggered by: ${{ github.event_name }}
-        
-        ## Files Generated
-        
-        ### Data Files
-        \`\`\`
-        $(ls -la combined_results/$(date +%Y-%m-%d)/data/ 2>/dev/null || echo "No data files")
-        \`\`\`
-        
-        ### Figures
-        \`\`\`
-        $(ls -la combined_results/$(date +%Y-%m-%d)/figures/ 2>/dev/null || echo "No figures")
-        \`\`\`
-        
-        ### Logs
-        \`\`\`
-        $(ls -la combined_results/$(date +%Y-%m-%d)/logs/ 2>/dev/null || echo "No logs")
-        \`\`\`
-        EOF
-        
-        # Create visualization gallery HTML
-        cat > combined_results/$(date +%Y-%m-%d)/visualization_gallery.html << 'HTML'
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Climate Analysis Visualization Gallery</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
-                .figure { border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
-                .figure img { width: 100%; height: auto; }
-                .figure h3 { margin: 10px 0; }
-                .figure p { color: #666; font-size: 14px; }
-            </style>
-        </head>
-        <body>
-            <h1>Climate-Epidemic Analysis Visualization Gallery</h1>
-            <div class="gallery">
-                <div class="figure">
-                    <h3>Strategy Comparison Dashboard</h3>
-                    <img src="figures/strategy_dashboard.png" alt="Strategy Dashboard">
-                    <p>Comprehensive comparison of all control strategies</p>
-                </div>
-                <div class="figure">
-                    <h3>Optimal Control Trajectories</h3>
-                    <img src="figures/control_trajectories.png" alt="Control Trajectories">
-                    <p>Time evolution of optimal control inputs</p>
-                </div>
-                <div class="figure">
-                    <h3>3D Phase Space</h3>
-                    <img src="figures/phase_space_3d.png" alt="Phase Space">
-                    <p>System trajectories in 3D phase space</p>
-                </div>
-                <div class="figure">
-                    <h3>Sensitivity Analysis</h3>
-                    <img src="figures/sensitivity_heatmap.png" alt="Sensitivity">
-                    <p>Parameter sensitivity heatmap</p>
-                </div>
-                <div class="figure">
-                    <h3>Uncertainty Quantification</h3>
-                    <img src="figures/uncertainty_bands.png" alt="Uncertainty">
-                    <p>Monte Carlo uncertainty bands</p>
-                </div>
-                <div class="figure">
-                    <h3>Epidemic Dynamics</h3>
-                    <img src="figures/epidemic_dynamics.png" alt="Epidemic">
-                    <p>SEIR compartment evolution</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        HTML
-        
-        # Commit results
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add combined_results/
-        git diff --staged --quiet || git commit -m "🤖 Combined climate analysis results - $(date '+%Y-%m-%d %H:%M')"
-        git push
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        echo "## Artifacts" >> REPORT.md
+        echo "Results are available as workflow artifacts for 30 days." >> REPORT.md
     
-    - name: Create issue on failure
-      if: failure()
-      uses: actions/github-script@v7
+    - name: Upload report
+      uses: actions/upload-artifact@v4
       with:
-        script: |
-          github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: '🚨 Climate Analysis Failed - ' + new Date().toISOString().split('T')[0],
-            body: `The automated climate analysis failed on ${new Date().toISOString()}.
-            
-            **Run Details:**
-            - Run ID: ${{ github.run_id }}
-            - Run Number: ${{ github.run_number }}
-            - Commit: ${{ github.sha }}
-            - Workflow: ${{ github.workflow }}
-            
-            **Parallel Jobs Status:**
-            - Baseline: ${{ needs.climate-analysis-baseline.result }}
-            - Sensitivity: ${{ needs.climate-analysis-sensitivity.result }}
-            - Uncertainty: ${{ needs.climate-analysis-uncertainty.result }}
-            - Control: ${{ needs.climate-analysis-control.result }}
-            
-            **Logs:**
-            - [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            
-            Please investigate the failure and take appropriate action.`
-          })
+        name: analysis-report
+        path: |
+          REPORT.md
+          combined_results/**/*.png
+        retention-days: 30
+
+  # Full analysis (weekly)
+  full-analysis:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential gfortran libopenblas-dev
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install psutil memory-profiler joblib
+    
+    - name: Run full analysis
+      run: |
+        python main.py \
+          --analysis-type full \
+          --parallel \
+          --output-dir results/full
+      env:
+        MPLBACKEND: Agg
+        PYTHONUNBUFFERED: 1
+        OMP_NUM_THREADS: 4
+        MAX_TIME: 7200
+        N_SAMPLES: 500
+        SIMULATION_DAYS: 365
+    
+    - name: Create release
+      if: success()
+      run: |
+        TAG="v$(date +%Y.%m.%d)"
+        echo "Creating release $TAG"
+        echo "TAG=$TAG" >> $GITHUB_ENV
+    
+    - name: Upload full results
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: full-analysis-results
+        path: results/full
+        retention-days: 90
