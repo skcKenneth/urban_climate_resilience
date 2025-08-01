@@ -33,20 +33,17 @@ This directory contains the complete results from the automated climate-epidemic
 
 ## Key Visualizations
 
-### Control Strategy Comparison
-![Strategy Dashboard](figures/strategy_dashboard.png)
+### Epidemic Dynamics
+![Epidemic Dynamics](figures/epidemic_dynamics.png)
 
-### Optimal Control Trajectories
-![Control Trajectories](figures/control_trajectories.png)
+### Climate Scenario Analysis
+![Baseline Scenario](figures/epidemic_dynamics_baseline.png)
+![Heatwave Scenario](figures/epidemic_dynamics_heatwave.png)
+![Extreme Weather Scenario](figures/epidemic_dynamics_extreme.png)
 
-### 3D Phase Space
-![Phase Space](figures/phase_space_3d.png)
-
-### Sensitivity Analysis
-![Sensitivity Heatmap](figures/sensitivity_heatmap.png)
-
-### Uncertainty Analysis
-![Uncertainty Bands](figures/uncertainty_bands.png)
+### System Analysis
+![Phase Portrait](figures/phase_portrait.png)
+![Bifurcation Diagram](figures/bifurcation_diagram.png)
 
 ## Run Information
 - Date: 2025-08-01T11:35:23Z
