@@ -15,8 +15,6 @@ from models.epidemic_model import EpidemicModel
 from models.climate_model import ClimateModel
 from models.coupled_model import CoupledClimateEpidemicNetwork
 from utils.visualization import Visualizer
-from analysis.sensitivity_analysis import SensitivityAnalysis
-from analysis.control_analysis import ControlAnalysis
 
 
 def run_epidemic_simulation(scenario='baseline', days=365):

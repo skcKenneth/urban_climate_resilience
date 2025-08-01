@@ -1,15 +1,11 @@
 """
-Utility modules for parameters, data generation, and visualization
+Utility modules for visualization
 """
 
-from .parameters import ModelParameters
-from .data_generator import DataGenerator
-from .visualization import SystemVisualizer
+from .visualization import Visualizer
 
 __all__ = [
-    'ModelParameters',
-    'DataGenerator',
-    'SystemVisualizer'
+    'Visualizer'
 ]
 
 __version__ = "1.0.0"

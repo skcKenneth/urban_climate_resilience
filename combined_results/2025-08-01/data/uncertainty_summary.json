@@ -1,8 +1,20 @@
 {
+  "generation_date": "2025-08-01T12:14:51.610182",
   "analysis_type": "uncertainty",
-  "timestamp": "2025-08-01T11:34:53Z",
-  "run_number": "6",
-  "commit": "a84a2f9b063ea8bf0f3d569312f1864196c4545c",
-  "status": "success",
-  "figures": ["results/2025-08-01/figures/epidemic_dynamics_extreme.png","results/2025-08-01/figures/epidemic_dynamics_baseline.png","results/2025-08-01/figures/epidemic_dynamics_heatwave.png","results/2025-08-01/figures/phase_portrait.png","results/2025-08-01/figures/bifurcation_diagram.png","results/2025-08-01/figures/epidemic_dynamics.png"]
+  "scenarios": [
+    "baseline",
+    "heatwave",
+    "extreme"
+  ],
+  "figures": [
+    "epidemic_dynamics.png",
+    "phase_portrait.png",
+    "bifurcation_diagram.png",
+    "sensitivity_heatmap.png",
+    "strategy_dashboard.png",
+    "control_trajectories.png",
+    "uncertainty_bands.png",
+    "phase_space_3d.png"
+  ],
+  "status": "success"
 }

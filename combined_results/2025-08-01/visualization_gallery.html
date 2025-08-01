@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Climate Analysis Visualization Gallery</title>
+    <title>Climate-Epidemic Analysis Results</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
-        .figure { border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+        .figure { border: 1px solid #ddd; padding: 10px; }
         .figure img { width: 100%; height: auto; }
         .figure h3 { margin: 10px 0; }
-        .figure p { color: #666; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -16,33 +15,27 @@
     <div class="gallery">
         <div class="figure">
             <h3>Epidemic Dynamics</h3>
-            <img src="figures/epidemic_dynamics.png" alt="Epidemic">
-            <p>SEIR compartment evolution over time</p>
-        </div>
-        <div class="figure">
-            <h3>Baseline Scenario</h3>
-            <img src="figures/epidemic_dynamics_baseline.png" alt="Baseline">
-            <p>Epidemic dynamics under baseline climate conditions</p>
-        </div>
-        <div class="figure">
-            <h3>Heatwave Scenario</h3>
-            <img src="figures/epidemic_dynamics_heatwave.png" alt="Heatwave">
-            <p>Epidemic dynamics during heatwave conditions</p>
-        </div>
-        <div class="figure">
-            <h3>Extreme Weather Scenario</h3>
-            <img src="figures/epidemic_dynamics_extreme.png" alt="Extreme">
-            <p>Epidemic dynamics under extreme weather conditions</p>
+            <img src="figures/epidemic_dynamics.png" alt="Epidemic Dynamics">
         </div>
         <div class="figure">
             <h3>Phase Portrait</h3>
             <img src="figures/phase_portrait.png" alt="Phase Portrait">
-            <p>System phase space trajectories</p>
         </div>
         <div class="figure">
-            <h3>Bifurcation Diagram</h3>
-            <img src="figures/bifurcation_diagram.png" alt="Bifurcation">
-            <p>System bifurcation analysis</p>
+            <h3>Sensitivity Analysis</h3>
+            <img src="figures/sensitivity_heatmap.png" alt="Sensitivity">
+        </div>
+        <div class="figure">
+            <h3>Control Strategies</h3>
+            <img src="figures/strategy_dashboard.png" alt="Strategies">
+        </div>
+        <div class="figure">
+            <h3>Uncertainty Bands</h3>
+            <img src="figures/uncertainty_bands.png" alt="Uncertainty">
+        </div>
+        <div class="figure">
+            <h3>3D Phase Space</h3>
+            <img src="figures/phase_space_3d.png" alt="3D Phase Space">
         </div>
     </div>
 </body>
