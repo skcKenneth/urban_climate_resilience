@@ -96,11 +96,41 @@ jobs:
         SIMULATION_DAYS: 365
       timeout-minutes: 60
     
+    - name: Generate visualizations
+      if: always()
+      run: |
+        # Ensure figures directory exists
+        mkdir -p figures/publication
+        
+        # List generated figures
+        echo "Generated figures:"
+        find figures/ -name "*.png" -o -name "*.pdf" | sort
+        
+        # Copy all figures to results directory
+        cp -r figures/ ${{ env.RESULTS_DIR }}/
+    
+    - name: Create analysis summary
+      if: always()
+      run: |
+        # Create analysis summary JSON
+        cat > ${{ env.RESULTS_DIR }}/baseline_summary.json << EOF
+        {
+          "analysis_type": "baseline",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "run_number": "${{ github.run_number }}",
+          "commit": "${{ github.sha }}",
+          "status": "${{ job.status }}",
+          "figures": $(find ${{ env.RESULTS_DIR }}/figures -name "*.png" -o -name "*.pdf" | jq -R -s -c 'split("\n")[:-1]')
+        }
+        EOF
+    
     - name: Upload baseline results
       uses: actions/upload-artifact@v4
       with:
         name: baseline-analysis-${{ github.run_number }}
-        path: results/
+        path: |
+          results/
+          figures/
         retention-days: 30
         compression-level: 6
 
@@ -169,11 +199,41 @@ jobs:
         SIMULATION_DAYS: 365
       timeout-minutes: 60
     
+    - name: Generate visualizations
+      if: always()
+      run: |
+        # Ensure figures directory exists
+        mkdir -p figures/publication
+        
+        # List generated figures
+        echo "Generated figures:"
+        find figures/ -name "*.png" -o -name "*.pdf" | sort
+        
+        # Copy all figures to results directory
+        cp -r figures/ ${{ env.RESULTS_DIR }}/
+    
+    - name: Create analysis summary
+      if: always()
+      run: |
+        # Create analysis summary JSON
+        cat > ${{ env.RESULTS_DIR }}/sensitivity_summary.json << EOF
+        {
+          "analysis_type": "sensitivity",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "run_number": "${{ github.run_number }}",
+          "commit": "${{ github.sha }}",
+          "status": "${{ job.status }}",
+          "figures": $(find ${{ env.RESULTS_DIR }}/figures -name "*.png" -o -name "*.pdf" | jq -R -s -c 'split("\n")[:-1]')
+        }
+        EOF
+    
     - name: Upload sensitivity results
       uses: actions/upload-artifact@v4
       with:
         name: sensitivity-analysis-${{ github.run_number }}
-        path: results/
+        path: |
+          results/
+          figures/
         retention-days: 30
         compression-level: 6
 
@@ -242,11 +302,41 @@ jobs:
         SIMULATION_DAYS: 365
       timeout-minutes: 60
     
+    - name: Generate visualizations
+      if: always()
+      run: |
+        # Ensure figures directory exists
+        mkdir -p figures/publication
+        
+        # List generated figures
+        echo "Generated figures:"
+        find figures/ -name "*.png" -o -name "*.pdf" | sort
+        
+        # Copy all figures to results directory
+        cp -r figures/ ${{ env.RESULTS_DIR }}/
+    
+    - name: Create analysis summary
+      if: always()
+      run: |
+        # Create analysis summary JSON
+        cat > ${{ env.RESULTS_DIR }}/uncertainty_summary.json << EOF
+        {
+          "analysis_type": "uncertainty",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "run_number": "${{ github.run_number }}",
+          "commit": "${{ github.sha }}",
+          "status": "${{ job.status }}",
+          "figures": $(find ${{ env.RESULTS_DIR }}/figures -name "*.png" -o -name "*.pdf" | jq -R -s -c 'split("\n")[:-1]')
+        }
+        EOF
+    
     - name: Upload uncertainty results
       uses: actions/upload-artifact@v4
       with:
         name: uncertainty-analysis-${{ github.run_number }}
-        path: results/
+        path: |
+          results/
+          figures/
         retention-days: 30
         compression-level: 6
 
@@ -315,17 +405,48 @@ jobs:
         SIMULATION_DAYS: 365
       timeout-minutes: 60
     
+    - name: Generate visualizations
+      if: always()
+      run: |
+        # Ensure figures directory exists
+        mkdir -p figures/publication
+        
+        # List generated figures
+        echo "Generated figures:"
+        find figures/ -name "*.png" -o -name "*.pdf" | sort
+        
+        # Copy all figures to results directory
+        cp -r figures/ ${{ env.RESULTS_DIR }}/
+    
+    - name: Create analysis summary
+      if: always()
+      run: |
+        # Create analysis summary JSON
+        cat > ${{ env.RESULTS_DIR }}/control_summary.json << EOF
+        {
+          "analysis_type": "control",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "run_number": "${{ github.run_number }}",
+          "commit": "${{ github.sha }}",
+          "status": "${{ job.status }}",
+          "figures": $(find ${{ env.RESULTS_DIR }}/figures -name "*.png" -o -name "*.pdf" | jq -R -s -c 'split("\n")[:-1]')
+        }
+        EOF
+    
     - name: Upload control results
       uses: actions/upload-artifact@v4
       with:
         name: control-analysis-${{ github.run_number }}
-        path: results/
+        path: |
+          results/
+          figures/
         retention-days: 30
         compression-level: 6
 
   # Combine results job
   combine-results:
-    needs: [climate-analysis-baseline, climate-analysis-sensitivity, climate-analysis-uncertainty, climate-analysis-control]
+    needs: [climate-analysis-baseline, climate-analysis-sensitivity, 
+            climate-analysis-uncertainty, climate-analysis-control]
     runs-on: ubuntu-latest
     if: always()
     
@@ -338,29 +459,152 @@ jobs:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
-        path: artifacts/
+        path: artifacts
     
-    - name: Combine and commit results
+    - name: Combine results
       run: |
-        # Create combined results directory
-        mkdir -p combined_results/$(date +%Y-%m-%d)
+        mkdir -p combined_results/$(date +%Y-%m-%d)/{data,figures,logs}
         
-        # Copy all results
-        find artifacts/ -name "*.png" -exec cp {} combined_results/$(date +%Y-%m-%d)/ \;
-        find artifacts/ -name "*.txt" -exec cp {} combined_results/$(date +%Y-%m-%d)/ \;
-        find artifacts/ -name "*.json" -exec cp {} combined_results/$(date +%Y-%m-%d)/ \;
+        # Copy all data files
+        find artifacts/ -name "*.json" -exec cp {} combined_results/$(date +%Y-%m-%d)/data/ \;
+        find artifacts/ -name "*.csv" -exec cp {} combined_results/$(date +%Y-%m-%d)/data/ \;
+        find artifacts/ -name "*.pkl" -exec cp {} combined_results/$(date +%Y-%m-%d)/data/ \;
         
-        # Create summary report
-        echo "# Combined Climate Analysis Results - $(date)" > combined_results/$(date +%Y-%m-%d)/README.md
-        echo "" >> combined_results/$(date +%Y-%m-%d)/README.md
-        echo "## Analysis Components" >> combined_results/$(date +%Y-%m-%d)/README.md
-        echo "- Baseline System Analysis" >> combined_results/$(date +%Y-%m-%d)/README.md
-        echo "- Sensitivity Analysis" >> combined_results/$(date +%Y-%m-%d)/README.md
-        echo "- Uncertainty Quantification" >> combined_results/$(date +%Y-%m-%d)/README.md
-        echo "- Optimal Control Analysis" >> combined_results/$(date +%Y-%m-%d)/README.md
-        echo "" >> combined_results/$(date +%Y-%m-%d)/README.md
-        echo "## Generated Files" >> combined_results/$(date +%Y-%m-%d)/README.md
-        ls -la combined_results/$(date +%Y-%m-%d)/ >> combined_results/$(date +%Y-%m-%d)/README.md
+        # Copy all log files
+        find artifacts/ -name "*.txt" -exec cp {} combined_results/$(date +%Y-%m-%d)/logs/ \;
+        
+        # Copy all figures
+        find artifacts/ -name "*.png" -exec cp {} combined_results/$(date +%Y-%m-%d)/figures/ \;
+        find artifacts/ -name "*.pdf" -exec cp {} combined_results/$(date +%Y-%m-%d)/figures/ \;
+        
+        # Create comprehensive summary report
+        cat > combined_results/$(date +%Y-%m-%d)/README.md << EOF
+        # Combined Climate Analysis Results - $(date)
+        
+        ## Summary
+        
+        This directory contains the complete results from the automated climate-epidemic analysis run.
+        
+        ## Analysis Components
+        
+        ### 1. Baseline System Analysis
+        - Status: ${{ needs.climate-analysis-baseline.result }}
+        - Focus: Core system dynamics without interventions
+        
+        ### 2. Sensitivity Analysis  
+        - Status: ${{ needs.climate-analysis-sensitivity.result }}
+        - Focus: Parameter sensitivity and system robustness
+        
+        ### 3. Uncertainty Quantification
+        - Status: ${{ needs.climate-analysis-uncertainty.result }}
+        - Focus: Monte Carlo uncertainty analysis
+        
+        ### 4. Optimal Control Analysis
+        - Status: ${{ needs.climate-analysis-control.result }}
+        - Focus: Optimal resource allocation strategies
+        
+        ## Directory Structure
+        
+        \`\`\`
+        $(date +%Y-%m-%d)/
+        ├── data/          # Analysis results in JSON/CSV format
+        ├── figures/       # All generated visualizations
+        └── logs/          # Execution logs
+        \`\`\`
+        
+        ## Key Visualizations
+        
+        ### Control Strategy Comparison
+        ![Strategy Dashboard](figures/strategy_dashboard.png)
+        
+        ### Optimal Control Trajectories
+        ![Control Trajectories](figures/control_trajectories.png)
+        
+        ### 3D Phase Space
+        ![Phase Space](figures/phase_space_3d.png)
+        
+        ### Sensitivity Analysis
+        ![Sensitivity Heatmap](figures/sensitivity_heatmap.png)
+        
+        ### Uncertainty Analysis
+        ![Uncertainty Bands](figures/uncertainty_bands.png)
+        
+        ## Run Information
+        - Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+        - Run Number: ${{ github.run_number }}
+        - Commit: ${{ github.sha }}
+        - Triggered by: ${{ github.event_name }}
+        
+        ## Files Generated
+        
+        ### Data Files
+        \`\`\`
+        $(ls -la combined_results/$(date +%Y-%m-%d)/data/ 2>/dev/null || echo "No data files")
+        \`\`\`
+        
+        ### Figures
+        \`\`\`
+        $(ls -la combined_results/$(date +%Y-%m-%d)/figures/ 2>/dev/null || echo "No figures")
+        \`\`\`
+        
+        ### Logs
+        \`\`\`
+        $(ls -la combined_results/$(date +%Y-%m-%d)/logs/ 2>/dev/null || echo "No logs")
+        \`\`\`
+        EOF
+        
+        # Create visualization gallery HTML
+        cat > combined_results/$(date +%Y-%m-%d)/visualization_gallery.html << 'HTML'
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Climate Analysis Visualization Gallery</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+                .figure { border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+                .figure img { width: 100%; height: auto; }
+                .figure h3 { margin: 10px 0; }
+                .figure p { color: #666; font-size: 14px; }
+            </style>
+        </head>
+        <body>
+            <h1>Climate-Epidemic Analysis Visualization Gallery</h1>
+            <div class="gallery">
+                <div class="figure">
+                    <h3>Strategy Comparison Dashboard</h3>
+                    <img src="figures/strategy_dashboard.png" alt="Strategy Dashboard">
+                    <p>Comprehensive comparison of all control strategies</p>
+                </div>
+                <div class="figure">
+                    <h3>Optimal Control Trajectories</h3>
+                    <img src="figures/control_trajectories.png" alt="Control Trajectories">
+                    <p>Time evolution of optimal control inputs</p>
+                </div>
+                <div class="figure">
+                    <h3>3D Phase Space</h3>
+                    <img src="figures/phase_space_3d.png" alt="Phase Space">
+                    <p>System trajectories in 3D phase space</p>
+                </div>
+                <div class="figure">
+                    <h3>Sensitivity Analysis</h3>
+                    <img src="figures/sensitivity_heatmap.png" alt="Sensitivity">
+                    <p>Parameter sensitivity heatmap</p>
+                </div>
+                <div class="figure">
+                    <h3>Uncertainty Quantification</h3>
+                    <img src="figures/uncertainty_bands.png" alt="Uncertainty">
+                    <p>Monte Carlo uncertainty bands</p>
+                </div>
+                <div class="figure">
+                    <h3>Epidemic Dynamics</h3>
+                    <img src="figures/epidemic_dynamics.png" alt="Epidemic">
+                    <p>SEIR compartment evolution</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        HTML
         
         # Commit results
         git config --local user.email "action@github.com"
