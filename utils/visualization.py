@@ -257,6 +257,47 @@ class SystemVisualizer:
         plt.savefig('figures/sensitivity_analysis.png', dpi=300)
         return fig
     
+    def plot_stability_analysis(self, stability_results):
+        """Plot stability analysis results"""
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        
+        # Plot eigenvalues in complex plane
+        eigenvalues = stability_results['eigenvalues']
+        real_parts = np.real(eigenvalues)
+        imag_parts = np.imag(eigenvalues)
+        
+        ax1.scatter(real_parts, imag_parts, s=100, c='red', alpha=0.7, edgecolors='black')
+        ax1.axvline(x=0, color='black', linestyle='--', alpha=0.5)
+        ax1.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+        ax1.set_xlabel('Real Part')
+        ax1.set_ylabel('Imaginary Part')
+        ax1.set_title('Eigenvalues in Complex Plane')
+        ax1.grid(True, alpha=0.3)
+        
+        # Add stability region
+        ax1.axvspan(-10, 0, alpha=0.1, color='green', label='Stable region')
+        ax1.legend()
+        
+        # Plot eigenvalue magnitudes
+        magnitudes = np.abs(eigenvalues)
+        indices = np.arange(len(eigenvalues))
+        
+        colors = ['green' if rp < 0 else 'red' for rp in real_parts]
+        ax2.bar(indices, magnitudes, color=colors, alpha=0.7)
+        ax2.set_xlabel('Eigenvalue Index')
+        ax2.set_ylabel('Magnitude')
+        ax2.set_title(f'Eigenvalue Magnitudes (System: {stability_results["stability"]})')
+        ax2.grid(True, alpha=0.3, axis='y')
+        
+        # Add text info
+        max_real = stability_results['max_real_part']
+        ax2.text(0.5, 0.95, f'Max Real Part: {max_real:.2e}', 
+                transform=ax2.transAxes, ha='center', va='top',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+        
+        plt.tight_layout()
+        return fig
+    
     def plot_uncertainty_analysis(self, mc_results, bounds):
         """Plot uncertainty quantification results"""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))

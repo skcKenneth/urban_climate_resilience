@@ -85,9 +85,10 @@ class ControlAnalysis:
         for i, vars in enumerate(variable_pairs):
             fig = self.visualizer.plot_phase_portrait(
                 results,
-                variables=vars,
-                save_path=str(self.results_dir / f'phase_portrait_{i+1}.png')
+                variables=vars
             )
+            fig.savefig(str(self.results_dir / f'phase_portrait_{i+1}.png'), dpi=300, bbox_inches='tight')
+            plt.close(fig)
         
         # Save summary statistics
         summary = self._compute_summary_statistics(results)
