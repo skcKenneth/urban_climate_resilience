@@ -5,12 +5,17 @@ import numpy as np
 import json
 import pickle
 from pathlib import Path
-from models.optimal_control import OptimalControlModel
-from models.coupled_system import CoupledSystemModel
-from utils.parameters import ModelParameters
-from utils.data_generator import ClimateDataGenerator, generate_network_snapshot
+import sys
+sys.path.append('..')
+
+from models.epidemic_model import EpidemicModel
+from models.climate_model import ClimateModel
+from models.network_model import NetworkModel
+from models.coupled_model import CoupledClimateEpidemicNetwork
 from utils.visualization import SystemVisualizer
-import logging
+from utils.academic_visualization import AcademicVisualizer
+from utils.logger_config import setup_logger
+from analysis.optimization import OptimalControlSolver
 
 logger = logging.getLogger(__name__)
 
@@ -275,3 +280,114 @@ class ControlAnalysis:
         
         logger.info(f"Publication figures saved to {pub_dir}")
         return figures
+
+    def run_analysis(self):
+        """Run complete control optimization analysis"""
+        logger.info("Starting control optimization analysis")
+        
+        # Initialize models
+        epidemic_model = EpidemicModel()
+        climate_model = ClimateModel()
+        
+        # Get climate scenarios
+        scenarios = self.generate_climate_scenarios()
+        
+        # Initialize visualizers
+        self.visualizer = SystemVisualizer()
+        self.academic_viz = AcademicVisualizer(style='paper')
+        
+        # Results storage
+        all_results = {
+            'scenarios': {},
+            'control_strategies': {},
+            'optimization_results': {}
+        }
+        
+        # Run control optimization for each scenario
+        for scenario_name, T_func in scenarios.items():
+            logger.info(f"Analyzing scenario: {scenario_name}")
+            
+            # Baseline simulation
+            baseline_results = self.simulate_baseline(
+                epidemic_model, climate_model, T_func, scenario_name
+            )
+            all_results['scenarios'][scenario_name] = baseline_results
+            
+            # Control optimization
+            control_results = self.optimize_control(
+                epidemic_model, climate_model, T_func, scenario_name
+            )
+            all_results['control_strategies'][scenario_name] = control_results
+        
+        # Generate comprehensive visualizations
+        self.generate_visualizations(all_results)
+        
+        # Save results
+        self.save_results(all_results)
+        
+        logger.info("Control analysis completed")
+        return all_results
+    
+    def generate_visualizations(self, results):
+        """Generate control analysis visualizations"""
+        logger.info("Generating control analysis visualizations")
+        
+        # Create results directory if it doesn't exist
+        self.results_dir.mkdir(exist_ok=True, parents=True)
+        
+        # 1. Academic-quality control optimization figure
+        control_results = {
+            't': results['scenarios']['baseline']['t'],
+            'controls': results['control_strategies'],
+            'states': results['scenarios'],
+            'costs': self._calculate_costs(results)
+        }
+        
+        fig = self.academic_viz.plot_control_optimization_results(
+            control_results,
+            save_path=self.results_dir / 'control_optimization_academic.png'
+        )
+        
+        # 2. Strategy comparison dashboard
+        fig = self.academic_viz.plot_strategy_comparison_dashboard(
+            results,
+            save_path=self.results_dir / 'strategy_dashboard.png'
+        )
+        
+        # 3. Control trajectories
+        fig = self.academic_viz.plot_control_trajectories(
+            results['control_strategies'],
+            results['scenarios']['baseline']['t'],
+            save_path=self.results_dir / 'control_trajectories.png'
+        )
+        
+        # 4. 3D phase space with control
+        fig = self.academic_viz.plot_phase_space_3d_academic(
+            results['scenarios']['optimal_control'],
+            save_path=self.results_dir / 'phase_space_3d.png'
+        )
+        
+        # 5. Generate additional visualizations for different scenarios
+        for i, (scenario_name, scenario_results) in enumerate(results['scenarios'].items()):
+            if i < 3:  # Limit to first 3 scenarios
+                self.visualizer.plot_phase_portrait(
+                    scenario_results['y'][0], scenario_results['y'][2],
+                    title=f"Phase Portrait - {scenario_name}",
+                    save_path=self.results_dir / f'phase_portrait_{i+1}.png'
+                )
+        
+        logger.info("Visualizations generated successfully")
+    
+    def _calculate_costs(self, results):
+        """Calculate costs for different control strategies"""
+        costs = {}
+        for strategy in results['control_strategies']:
+            # Simple cost calculation (would be more complex in reality)
+            control_effort = np.sum(results['control_strategies'][strategy].get('control', 0))
+            health_cost = np.sum(results['scenarios'][strategy]['y'][2])  # Infected
+            costs[strategy] = {
+                'control': control_effort * 100,
+                'health': health_cost * 1000,
+                'total': control_effort * 100 + health_cost * 1000
+            }
+        return costs
