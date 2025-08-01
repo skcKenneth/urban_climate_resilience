@@ -177,18 +177,23 @@ def run_analysis(analysis_type='full', quick_mode=False, parallel=False, output_
             stability = StabilityAnalysis(scenarios['baseline'])
             
             # Phase portrait using baseline results
-            if 'baseline' in all_results:
+            if 'baseline' in all_results and all_results['baseline'] is not None:
+                # Convert our result format to what plot_phase_portrait expects
+                phase_portrait_data = {
+                    'baseline': {
+                        'y': all_results['baseline']['state']  # state contains [S, E, I, R, k_avg, C]
+                    }
+                }
                 fig = visualizer.plot_phase_portrait(
-                    all_results['baseline'],
+                    phase_portrait_data,
                     variables=['I', 'k_avg']
                 )
                 fig.savefig(f"{output_dir}/phase_portrait.png", dpi=150, bbox_inches='tight')
                 plt.close(fig)
             
             # Bifurcation analysis
-            bifurcation_results = stability.bifurcation_analysis(
-                parameter_name='temperature_baseline',
-                parameter_range=np.linspace(15, 40, 20 if quick_mode else 50)
+            bifurcation_results = stability.bifurcation_analysis_temperature(
+                T_range=np.linspace(15, 40, 20 if quick_mode else 50)
             )
             fig = visualizer.plot_bifurcation_diagram(bifurcation_results)
             fig.savefig(f"{output_dir}/bifurcation_diagram.png", dpi=150, bbox_inches='tight')
@@ -216,7 +221,10 @@ def run_analysis(analysis_type='full', quick_mode=False, parallel=False, output_
                 plt.close(fig)
             
         except Exception as e:
+            import traceback
             print(f"Error in additional analyses: {e}")
+            print("Traceback:")
+            traceback.print_exc()
     
     print("\n" + "=" * 60)
     print("Analysis complete!")

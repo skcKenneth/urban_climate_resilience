@@ -39,6 +39,32 @@ jobs:
       env:
         MPLBACKEND: Agg
         QUICK_MODE: true
+    
+    - name: Run full mode test (reduced)
+      run: |
+        # Create a reduced full mode test
+        cat << 'EOF' > test_full_reduced.py
+        import os
+        import sys
+        import subprocess
+        
+        # Set reduced parameters for CI
+        env = os.environ.copy()
+        env['QUICK_MODE'] = 'false'
+        env['MAX_TIME'] = '300'
+        env['N_SAMPLES'] = '50'
+        env['SIMULATION_DAYS'] = '90'
+        env['MPLBACKEND'] = 'Agg'
+        
+        # Run full analysis with reduced parameters
+        result = subprocess.run([
+            sys.executable, 'main.py', '--analysis-type', 'full'
+        ], env=env)
+        
+        sys.exit(result.returncode)
+        EOF
+        
+        python test_full_reduced.py
 
   # Main analysis job
   analysis:
