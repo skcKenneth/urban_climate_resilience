@@ -1,0 +1,8 @@
+{
+  "analysis_type": "baseline",
+  "timestamp": "2025-08-01T11:32:21Z",
+  "run_number": "5",
+  "commit": "5d367a24d4ace342b2d85efa2d1bdc3c50758b59",
+  "status": "success",
+  "figures": ["results/2025-08-01/figures/epidemic_dynamics_extreme.png","results/2025-08-01/figures/epidemic_dynamics_baseline.png","results/2025-08-01/figures/epidemic_dynamics_heatwave.png","results/2025-08-01/figures/phase_portrait.png","results/2025-08-01/figures/bifurcation_diagram.png","results/2025-08-01/figures/epidemic_dynamics.png"]
+}
