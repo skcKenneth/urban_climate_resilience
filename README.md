@@ -1,101 +1,148 @@
-# Urban Climate-Social Network Resilience System
+# Climate-Epidemic Coupled System Analysis
 
-![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Analysis](https://img.shields.io/badge/Analysis-Automated-green.svg)
-![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)
+[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![CI](https://github.com/your-username/climate-epidemic-model/actions/workflows/run_analysis.yml/badge.svg)](https://github.com/your-username/climate-epidemic-model/actions)
 
-A comprehensive mathematical modeling framework for analyzing the coupled dynamics of climate change, epidemiological spread, and social network evolution in urban environments.
+A computational framework for analyzing the coupled dynamics of climate change and epidemic spread, incorporating social network effects and optimal control strategies.
 
 ## Overview
 
-This project implements a sophisticated mathematical model that integrates:
-- Climate-forced epidemiological dynamics (modified SEIR)
-- Dynamic social network evolution
-- Coupled system behavior with feedback loops
-- Optimal control for resource allocation
-- Stability and bifurcation analysis
-- Comprehensive sensitivity analysis and uncertainty quantification
+This repository contains the implementation of a coupled climate-epidemic model that examines:
+- SEIR epidemic dynamics under climate influence
+- Temperature-dependent transmission rates
+- Network structure evolution during epidemics
+- Optimal control strategies for epidemic mitigation
+- Sensitivity and uncertainty quantification
 
-## Mathematical Models
+## Quick Start
 
-### 1. Climate-Epidemiological Model
-- SEIR compartmental model with climate forcing
-- Temperature and humidity dependent transmission rates
-- Social behavior modifications under climate stress
+```bash
+# Clone the repository
+git clone https://github.com/your-username/climate-epidemic-model.git
+cd climate-epidemic-model
 
-### 2. Dynamic Network Model
-- Scale-free network with geographic constraints
-- Climate-dependent edge formation and dissolution
-- Preferential attachment with environmental stress
-
-### 3. Coupled System Dynamics
-- Bidirectional coupling between epidemic and network
-- Network connectivity affects disease transmission
-- Disease prevalence influences social structure
-
-### 4. Optimal Control Framework
-- Multi-objective optimization for resource allocation
-- Medical, social, and climate mitigation interventions
-- Budget constraints and dynamic programming
-
-## Installation
-
-```
+# Install dependencies
 pip install -r requirements.txt
+
+# Run the main analysis
+python run_analysis.py
+
+# Generate all figures
+python generate_all_figures.py
 ```
 
+## Model Description
 
-## Usage
+### Epidemic Model (SEIR)
+The model uses a modified SEIR framework with climate coupling:
+- **S**: Susceptible population
+- **E**: Exposed population  
+- **I**: Infected population
+- **R**: Recovered population
 
-Run the complete analysis:
+### Climate Coupling
+Temperature affects transmission rate through:
 ```
-python main.py
+β(T) = β₀ * (1 + α_T * (T - T_ref))
 ```
 
+### Network Dynamics
+Contact network evolves based on:
+- Disease awareness
+- Climate conditions
+- Social distancing measures
 
-This will:
-1. Generate climate scenarios (baseline, heatwave, extreme)
-2. Simulate coupled system dynamics
-3. Perform stability and bifurcation analysis
-4. Compare optimal control strategies
-5. Conduct sensitivity analysis
-6. Generate uncertainty quantifications
-7. Produce policy recommendations
+## Repository Structure
 
-## Output Files
-
-- `epidemic_dynamics_*.png` - Time series plots for each scenario
-- `phase_portrait.png` - System phase space analysis
-- `bifurcation_diagram.png` - Temperature-dependent stability analysis
-- `control_strategies.png` - Comparison of intervention strategies
-- `sensitivity_analysis.png` - Parameter sensitivity results
-- `uncertainty_analysis.png` - Monte Carlo uncertainty bounds
+```
+climate-epidemic-model/
+├── models/                 # Core model implementations
+│   ├── epidemic_model.py   # SEIR dynamics
+│   ├── climate_model.py    # Climate scenarios
+│   └── coupled_model.py    # Integrated system
+├── analysis/              # Analysis modules
+│   ├── sensitivity_analysis.py
+│   └── control_analysis.py
+├── utils/                 # Utilities
+│   └── visualization.py   # Plotting functions
+├── figures/               # Generated figures
+├── run_analysis.py        # Main analysis script
+└── requirements.txt       # Dependencies
+```
 
 ## Key Results
 
-The model reveals:
-- Critical temperature thresholds where system behavior changes dramatically
-- Optimal intervention strategies balancing health and social costs
-- Early warning indicators for system-wide resilience failures
-- Policy recommendations for urban planning and public health
+The analysis produces:
 
-## Model Validation
+1. **Epidemic Dynamics**: Comparison across climate scenarios (baseline, heatwave, extreme)
+2. **Phase Portraits**: System trajectories in S-I phase space
+3. **Sensitivity Analysis**: Parameter importance via Sobol indices
+4. **Control Strategies**: Comparison of intervention effectiveness
 
-- Sobol sensitivity analysis identifies key parameters
-- Monte Carlo uncertainty quantification
-- Cross-validation with multiple scenarios
-- Stability analysis confirms model robustness
+## Usage Examples
 
-## Applications
+### Run Basic Simulation
+```python
+from models.epidemic_model import EpidemicModel
+from models.climate_model import ClimateModel
+from models.coupled_model import CoupledClimateEpidemicNetwork
 
-- Urban climate adaptation planning
-- Public health emergency preparedness
-- Social network intervention design
-- Resource allocation optimization
-- Early warning system development
+# Initialize models
+epidemic = EpidemicModel()
+climate = ClimateModel()
+coupled = CoupledClimateEpidemicNetwork(epidemic, climate)
+
+# Run simulation
+t = np.linspace(0, 365, 365)
+results = coupled.simulate(t)
+```
+
+### Generate Custom Figures
+```python
+from utils.visualization import Visualizer
+
+viz = Visualizer()
+viz.plot_epidemic_dynamics(results, save_path='my_figure.png')
+```
+
+## Citation
+
+If you use this code in your research, please cite:
+
+```bibtex
+@article{yourname2024climate,
+  title={Coupled Climate-Epidemic Dynamics with Network Effects},
+  author={Your Name},
+  journal={Journal Name},
+  year={2024}
+}
+```
+
+## Requirements
+
+- Python 3.8+
+- NumPy
+- SciPy  
+- Matplotlib
+- Seaborn
+- NetworkX
+
+See `requirements.txt` for complete list.
+
+## Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
 ## License
 
-MIT License - See LICENSE file for details
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
+
+## Contact
+
+For questions or collaborations, please contact [your-email@example.com]
 
