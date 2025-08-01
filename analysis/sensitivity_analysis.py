@@ -341,3 +341,109 @@ class SensitivityAnalysis:
                 }
         
         return bounds
+
+    def morris_screening(self, n_samples=100, n_groups=10, parameter_ranges=None):
+        """
+        Perform Morris screening sensitivity analysis
+        
+        Args:
+            n_samples: Number of samples for Morris method
+            n_groups: Number of groups for grouping parameters
+            parameter_ranges: Dict of parameter ranges {param: (min, max)}
+            
+        Returns:
+            Dict with Morris screening results
+        """
+        if parameter_ranges is None:
+            parameter_ranges = {
+                'beta_0': (0.1, 0.5),
+                'alpha_T': (0.01, 0.05),
+                'sigma': (0.1, 0.3),
+                'gamma': (0.1, 0.3),
+                'kappa': (0.1, 0.5),
+                'epsilon': (0.5, 2.0),
+                'sigma_k': (5, 20),
+                'T_critical': (35, 45)
+            }
+        
+        param_names = list(parameter_ranges.keys())
+        n_params = len(param_names)
+        
+        # Generate Morris trajectories
+        delta = 1.0 / (n_groups - 1)
+        elementary_effects = {param: [] for param in param_names}
+        
+        print(f"Running Morris screening with {n_samples} trajectories...")
+        
+        for i in range(min(n_samples, 50)):  # Limit for performance
+            if self.check_timeout():
+                break
+                
+            # Generate base point
+            base_point = np.random.random(n_params)
+            
+            # Scale to parameter ranges
+            scaled_params = {}
+            for j, param in enumerate(param_names):
+                min_val, max_val = parameter_ranges[param]
+                scaled_params[param] = min_val + base_point[j] * (max_val - min_val)
+            
+            # Calculate base output
+            base_output = self._evaluate_model_with_params(scaled_params)
+            
+            # Calculate elementary effects
+            for j, param in enumerate(param_names):
+                # Perturb parameter
+                perturbed_params = scaled_params.copy()
+                min_val, max_val = parameter_ranges[param]
+                perturbed_params[param] = min(max_val, scaled_params[param] + delta * (max_val - min_val))
+                
+                # Calculate effect
+                perturbed_output = self._evaluate_model_with_params(perturbed_params)
+                effect = (perturbed_output - base_output) / (delta * (max_val - min_val))
+                elementary_effects[param].append(effect)
+        
+        # Calculate Morris indices
+        morris_indices = {}
+        for param in param_names:
+            effects = np.array(elementary_effects[param])
+            morris_indices[param] = {
+                'mu': np.mean(effects),
+                'mu_star': np.mean(np.abs(effects)),
+                'sigma': np.std(effects)
+            }
+        
+        return {
+            'parameters': param_names,
+            'indices': morris_indices,
+            'n_trajectories': len(elementary_effects[param_names[0]])
+        }
+    
+    def _evaluate_model_with_params(self, param_dict):
+        """Helper method to evaluate model with specific parameters"""
+        # Create a copy of current params
+        temp_params = ModelParameters()
+        
+        # Update with new values
+        for param, value in param_dict.items():
+            if hasattr(temp_params, param):
+                setattr(temp_params, param, value)
+        
+        # Run simplified simulation
+        model = CoupledSystemModel(temp_params, n_nodes=100)
+        
+        # Simple epidemic scenario
+        t = np.linspace(0, 30, 30)  # 30 days
+        T_func = lambda time: 25 + 5*np.sin(2*np.pi*time/365)
+        H_func = lambda time: 0.7
+        
+        try:
+            time_points, states = model.solve_coupled_system(
+                T_func, H_func, initial_conditions=None,
+                t_span=(0, 30), t_eval=t
+            )
+            
+            # Return peak infection as output metric
+            return np.max(states[1, :])
+        except:
+            return 0.0

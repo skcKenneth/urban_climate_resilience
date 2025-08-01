@@ -32,6 +32,7 @@ class ModelParameters:
         
         # Network parameters
         self.k_0 = 8.0  # Base average degree
+        self.C_0 = 0.3  # Initial clustering coefficient
         self.sigma_k = 3.0  # Network temperature sensitivity
         self.lambda_dist = 0.1  # Distance decay parameter
         self.xi = 0.02  # Base edge dissolution rate

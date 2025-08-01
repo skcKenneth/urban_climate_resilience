@@ -174,7 +174,7 @@ def run_full_analysis_for_paper(output_dir='results'):
     try:
         eq_analysis = stability.stability_analysis(final_state, final_T, final_H)
         print(f"Eigenvalues: {eq_analysis['eigenvalues']}")
-        print(f"System stable: {eq_analysis['stable']}")
+        print(f"System stability: {eq_analysis['stability']}")
         
         # Plot stability
         fig = viz.plot_stability_analysis(eq_analysis)

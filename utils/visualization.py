@@ -770,6 +770,82 @@ class SystemVisualizer:
         
         return figures
     
+    def compare_scenarios(self, scenario_data):
+        """Compare different scenarios side by side"""
+        n_scenarios = len(scenario_data)
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        axes = axes.flatten()
+        
+        colors = ['blue', 'orange', 'red']
+        
+        for idx, (scenario_name, data) in enumerate(scenario_data.items()):
+            y = data['y']
+            params = data['params']
+            
+            # Plot on all subplots
+            # 1. Infections over time
+            ax = axes[0]
+            ax.plot(y[1, :], label=scenario_name.capitalize(), 
+                   color=colors[idx % len(colors)], linewidth=2, alpha=0.8)
+            ax.set_ylabel('Infected Population')
+            ax.set_xlabel('Time (days)')
+            ax.set_title('Infection Dynamics Comparison')
+            ax.grid(True, alpha=0.3)
+            ax.legend()
+            
+            # 2. Network degree over time
+            ax = axes[1]
+            ax.plot(y[4, :], label=scenario_name.capitalize(), 
+                   color=colors[idx % len(colors)], linewidth=2, alpha=0.8)
+            ax.set_ylabel('Average Network Degree')
+            ax.set_xlabel('Time (days)')
+            ax.set_title('Network Evolution Comparison')
+            ax.grid(True, alpha=0.3)
+            ax.legend()
+            
+            # 3. Peak values comparison (bar chart)
+            if idx == 0:
+                peak_infections = []
+                peak_degrees = []
+                scenario_names = []
+            
+            peak_infections.append(np.max(y[1, :]))
+            peak_degrees.append(np.max(y[4, :]))
+            scenario_names.append(scenario_name.capitalize())
+        
+        # 3. Peak infections bar chart
+        ax = axes[2]
+        x_pos = np.arange(len(scenario_names))
+        ax.bar(x_pos, peak_infections, color=colors[:len(scenario_names)], alpha=0.7)
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(scenario_names)
+        ax.set_ylabel('Peak Infections')
+        ax.set_title('Maximum Infection Levels')
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # 4. Final state comparison
+        ax = axes[3]
+        width = 0.25
+        metrics = ['Susceptible', 'Infected', 'Recovered']
+        
+        for idx, (scenario_name, data) in enumerate(scenario_data.items()):
+            y = data['y']
+            final_state = [y[0, -1], y[1, -1], y[2, -1]]
+            x_pos = np.arange(len(metrics)) + idx * width
+            ax.bar(x_pos, final_state, width, label=scenario_name.capitalize(),
+                  color=colors[idx % len(colors)], alpha=0.7)
+        
+        ax.set_xlabel('Compartment')
+        ax.set_ylabel('Final Population')
+        ax.set_title('Final State Comparison')
+        ax.set_xticks(np.arange(len(metrics)) + width)
+        ax.set_xticklabels(metrics)
+        ax.legend()
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        plt.tight_layout()
+        return fig
+    
     def generate_latex_figure_code(self, figure_names, save_path='figures/latex_figures.tex'):
         """Generate LaTeX code for including figures in paper"""
         latex_code = r"""% LaTeX code for including figures in your paper
