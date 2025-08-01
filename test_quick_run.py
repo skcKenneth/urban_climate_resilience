@@ -5,6 +5,7 @@ Test script for quick mode analysis
 import os
 import sys
 import subprocess
+import glob
 
 def test_quick_mode():
     """Test the quick mode analysis"""
@@ -30,7 +31,7 @@ def test_quick_mode():
         # Run the analysis
         print("\n🚀 Starting quick mode analysis...")
         result = subprocess.run([
-            sys.executable, 'auto_run.py', '--analysis-type', 'quick'
+            sys.executable, 'main.py', '--analysis-type', 'quick', '--quick-mode'
         ], env=env, capture_output=True, text=True, timeout=600)  # 10 minute timeout
         
         print("✅ Analysis completed!")
@@ -45,8 +46,7 @@ def test_quick_mode():
             print(result.stderr[-500:])  # Last 500 chars
         
         # Check for generated files
-        import glob
-        png_files = glob.glob("*.png")
+        png_files = glob.glob("results/*.png")
         if png_files:
             print(f"\n📈 Generated {len(png_files)} PNG files:")
             for f in png_files:
