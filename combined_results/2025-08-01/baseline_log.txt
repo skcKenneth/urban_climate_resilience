@@ -1,0 +1,92 @@
+============================================================
+AUTOMATED CLIMATE-SOCIAL RESILIENCE ANALYSIS
+Analysis Type: BASELINE
+🤖 Running in GitHub Actions environment
+============================================================
+Selected Mode: Full
+Max Analysis Time: 60.0 minutes
+Monte Carlo Samples: 500
+Simulation Days: 365
+Cache Enabled: False
+
+Starting automated analysis...
+Check debug_log.txt for progress updates.
+2025-08-01 06:31:58,539 - INFO - Python: 3.11.13 (main, Jun  4 2025, 04:12:12) [GCC 13.3.0]
+2025-08-01 06:31:58,539 - INFO - Platform: linux
+2025-08-01 06:31:58,539 - INFO - Memory: 16.8GB total, 15.9GB available
+2025-08-01 06:31:58,540 - INFO - Attempt 1/3
+2025-08-01 06:31:58,540 - INFO - Starting full analysis...
+2025-08-01 06:32:00,005 - INFO - generated new fontManager
+============================================================
+Urban Climate-Social Network Resilience System Analysis
+============================================================
+Quick Mode: False
+Max Time: 60.0 minutes
+Simulation Days: 365
+
+1. Generating climate scenarios...
+
+2. Running basic system simulations...
+   Processing baseline scenario...
+      Final attack rate: 0.103
+      Peak infections: 2377
+      Min network degree: 0.01
+   Processing heatwave scenario...
+      Final attack rate: 0.098
+      Peak infections: 2302
+      Min network degree: 0.00
+   Processing extreme scenario...
+      Final attack rate: 0.133
+      Peak infections: 3410
+      Min network degree: 0.00
+
+3. Creating basic visualizations...
+      Visualization error for baseline: SystemVisualizer.plot_epidemic_dynamics() got an unexpected keyword argument 'save_path'
+      Visualization error for heatwave: SystemVisualizer.plot_epidemic_dynamics() got an unexpected keyword argument 'save_path'
+      Visualization error for extreme: SystemVisualizer.plot_epidemic_dynamics() got an unexpected keyword argument 'save_path'
+
+4. Running stability analysis...
+   Stability analysis error: generator didn't stop after throw()
+
+5. Running sensitivity analysis...
+/home/runner/work/urban_climate_resilience/urban_climate_resilience/analysis/sensitivity_analysis.py:39: UserWarning: The balance properties of Sobol' points require n to be a power of 2.
+  samples = sampler.random(n=n_samples)
+Running Sobol sensitivity analysis with 500 samples...
+Progress: 0/500 (0.0%)
+Progress: 50/500 (10.0%)
+Progress: 100/500 (20.0%)
+Progress: 150/500 (30.0%)
+Progress: 200/500 (40.0%)
+Progress: 250/500 (50.0%)
+Progress: 300/500 (60.0%)
+Progress: 350/500 (70.0%)
+Simulation failed: Operation timed out after 900 seconds
+⚠️  Stopping analysis due to timeout
+
+6. Running Monte Carlo uncertainty analysis...
+Running Monte Carlo uncertainty analysis with 500 samples...
+Progress: 0/500 (0.0%)
+Progress: 50/500 (10.0%)
+Progress: 100/500 (20.0%)
+Progress: 150/500 (30.0%)
+Progress: 200/500 (40.0%)
+Progress: 250/500 (50.0%)
+Progress: 300/500 (60.0%)
+Progress: 350/500 (70.0%)
+Progress: 400/500 (80.0%)
+Progress: 450/500 (90.0%)
+   Monte Carlo analysis error: SystemVisualizer.plot_uncertainty_analysis() missing 1 required positional argument: 'bounds'
+
+7. Running optimal control analysis...
+   Optimal control error: generator didn't stop after throw()
+
+============================================================
+Analysis completed!
+============================================================
+2025-08-01 06:57:09,974 - INFO - Success! Execution time: 1511.43 seconds
+2025-08-01 06:57:09,974 - INFO - Final memory usage: 533.9 MB
+
+🎉 SUCCESS! Analysis completed.
+📊 Check the generated PNG files for results.
+📝 Full log available in debug_log.txt
+🔄 Results will be committed to repository automatically.
