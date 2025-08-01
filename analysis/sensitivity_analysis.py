@@ -447,9 +447,21 @@ class SensitivityAnalysis:
                 return 0.7 * np.ones_like(np.atleast_1d(time))
         
         try:
+            # Set initial conditions
+            S0 = temp_params.N - 100  # Start with 100 infected
+            I0 = 100
+            R0 = 0
+            E0 = 0
+            k0 = temp_params.k_0
+            C0 = temp_params.C_0
+            y0 = np.array([S0, I0, R0, E0, k0, C0])
+            
             time_points, states = model.solve_coupled_system(
-                T_func, H_func, initial_conditions=None,
-                t_span=(0, 30), t_eval=t
+                t_span=(0, 30),
+                y0=y0,
+                T_func=T_func,
+                H_func=H_func,
+                t_eval=t
             )
             
             # Return peak infection as output metric
