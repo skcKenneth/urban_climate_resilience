@@ -41,10 +41,19 @@ def timeout_context(seconds):
             pass
 
 def main():
-    """Main analysis pipeline"""
+    """Main analysis pipeline with optimized settings"""
     print("=" * 60)
     print("Urban Climate-Social Network Resilience System Analysis")
     print("=" * 60)
+    
+    # Get environment settings
+    quick_mode = os.getenv('QUICK_MODE', 'false').lower() == 'true'
+    max_time = int(os.getenv('MAX_TIME', 1200))  # Default 20 minutes
+    simulation_days = int(os.getenv('SIMULATION_DAYS', 365))
+    
+    print(f"Quick Mode: {quick_mode}")
+    print(f"Max Time: {max_time/60:.1f} minutes")
+    print(f"Simulation Days: {simulation_days}")
     
     # Initialize components
     params = ModelParameters()
@@ -55,6 +64,11 @@ def main():
     # Generate climate scenarios
     print("\n1. Generating climate scenarios...")
     climate_scenarios = data_gen.generate_climate_scenarios()
+    
+    # Limit scenarios in quick mode
+    if quick_mode:
+        climate_scenarios = {k: v for k, v in list(climate_scenarios.items())[:2]}
+        print(f"Quick mode: Using only {len(climate_scenarios)} scenarios")
     
     # Task 1-3: Basic system analysis
     print("\n2. Running basic system simulations...")
@@ -74,21 +88,22 @@ def main():
         # Initial conditions
         y0 = [params.N * 0.99, 0, params.N * 0.01, 0, params.k_0, 0.3]
         
-        # Solve system
+        # Solve system with timeout
         try:
-            t, y = coupled_model.solve_coupled_system([0, 365], y0, T_func, H_func)
-            results[scenario_name] = {'t': t, 'y': y, 'T_func': T_func, 'H_func': H_func}
-            
-            # Calculate final metrics
-            S, E, I, R, k_avg, C = y
-            final_attack_rate = R[-1] / params.N
-            peak_infections = np.max(I)
-            min_network_degree = np.min(k_avg)
-            
-            print(f"      Final attack rate: {final_attack_rate:.3f}")
-            print(f"      Peak infections: {peak_infections:.0f}")
-            print(f"      Min network degree: {min_network_degree:.2f}")
-            
+            with timeout_context(max_time // len(climate_scenarios)):
+                t, y = coupled_model.solve_coupled_system([0, simulation_days], y0, T_func, H_func)
+                results[scenario_name] = {'t': t, 'y': y, 'T_func': T_func, 'H_func': H_func}
+                
+                # Calculate final metrics
+                S, E, I, R, k_avg, C = y
+                final_attack_rate = R[-1] / params.N
+                peak_infections = np.max(I)
+                min_network_degree = np.min(k_avg)
+                
+                print(f"      Final attack rate: {final_attack_rate:.3f}")
+                print(f"      Peak infections: {peak_infections:.0f}")
+                print(f"      Min network degree: {min_network_degree:.2f}")
+                
         except Exception as e:
             print(f"      Error in {scenario_name}: {e}")
             continue
@@ -97,162 +112,110 @@ def main():
     print("\n3. Creating basic visualizations...")
     for scenario_name, result in results.items():
         if 'y' in result:
-            fig = visualizer.plot_epidemic_dynamics(
-                result['t'], result['y'], result['T_func'],
-                title=f"Epidemic Dynamics - {scenario_name.title()} Scenario"
-            )
-            plt.savefig(f'figures/epidemic_dynamics_{scenario_name}.png', dpi=300, bbox_inches='tight')
-            plt.close()
+            try:
+                fig = visualizer.plot_epidemic_dynamics(
+                    result['t'], result['y'], 
+                    f"Epidemic Dynamics - {scenario_name}",
+                    save_path=f"epidemic_dynamics_{scenario_name}.png"
+                )
+                plt.close(fig)  # Close to free memory
+                
+                fig = visualizer.plot_network_evolution(
+                    result['t'], result['y'],
+                    f"Network Evolution - {scenario_name}",
+                    save_path=f"network_evolution_{scenario_name}.png"
+                )
+                plt.close(fig)
+                
+            except Exception as e:
+                print(f"      Visualization error for {scenario_name}: {e}")
+                continue
     
-    # Phase portrait
-    if len(results) > 0:
-        fig = visualizer.plot_phase_portrait(results, ['I', 'k_avg'])
-        plt.savefig('figures/phase_portrait.png', dpi=300, bbox_inches='tight')
-        plt.close()
-    
-    # Task 3: Stability and bifurcation analysis
-    print("\n4. Performing stability analysis...")
-    stability_analyzer = StabilityAnalysis(params)
-    
-    # Bifurcation analysis over temperature range
-    T_range = np.linspace(20, 45, 25)
-    bifurcation_results = stability_analyzer.bifurcation_analysis_temperature(T_range)
-    
-    # Plot bifurcation diagram
-    if bifurcation_results['temperatures']:
-        fig = visualizer.plot_bifurcation_diagram(bifurcation_results)
-        plt.savefig('figures/bifurcation_diagram.png', dpi=300, bbox_inches='tight')
-        plt.close()
-        
-        # Find critical points
-        critical_points = stability_analyzer.critical_temperature_analysis(T_range)
-        print(f"   Found {len(critical_points)} critical temperature points:")
-        for cp in critical_points:
-            print(f"      T_critical = {cp['temperature']:.2f}°C ({cp['type']})")
-    
-    # Task 4: Optimal control analysis
-    print("\n5. Analyzing optimal control strategies...")
-    control_model = OptimalControlModel(params)
-    
-    # Budget function (increasing over time)
-    budget_func = lambda t: 150 + 50 * np.sin(2*np.pi*t/365)
-    
-    # Compare control strategies using heatwave scenario
-    if 'heatwave' in results:
-        heatwave_result = results['heatwave']
-        T_func = heatwave_result['T_func']
-        H_func = heatwave_result['H_func']
-        y0 = [params.N * 0.99, 0, params.N * 0.01, 0, params.k_0, 0.3]
-        
+    # Task 4: Stability analysis (skip in quick mode)
+    if not quick_mode:
+        print("\n4. Running stability analysis...")
         try:
-            # Apply timeout for GitHub Actions environment
-            timeout_seconds = int(os.getenv('MAX_TIME', '600'))  # Default 10 minutes
-            print(f"   Control analysis timeout: {timeout_seconds/60:.1f} minutes")
+            stability_analyzer = StabilityAnalysis(params)
             
-            with timeout_context(timeout_seconds):
-                strategy_comparison = control_model.compare_strategies(
-                    [0, 365], y0, T_func, H_func, budget_func
-            )
-            
-            # Print strategy comparison
-            print("   Strategy comparison results:")
-            for strategy, result in strategy_comparison.items():
-                if 'total_infections' in result:
-                    print(f"      {strategy}: Total infections = {result['total_infections']:.0f}, "
-                          f"Peak = {result['peak_infections']:.0f}")
-            
-            # Visualize strategy comparison
-            fig = visualizer.plot_control_strategies(strategy_comparison)
-            plt.savefig('figures/control_strategies.png', dpi=300, bbox_inches='tight')
-            plt.close()
-            
+            with timeout_context(max_time // 4):
+                stability_results = stability_analyzer.analyze_system_stability()
+                
+            # Visualize stability results
+            if stability_results:
+                fig = visualizer.plot_stability_analysis(stability_results)
+                plt.savefig("stability_analysis.png", dpi=150, bbox_inches='tight')
+                plt.close(fig)
+                
         except Exception as e:
-            print(f"   Error in control analysis: {e}")
+            print(f"   Stability analysis error: {e}")
+    else:
+        print("\n4. Skipping stability analysis (quick mode)")
     
-    # Task 5: Model validation and sensitivity analysis
-    print("\n6. Performing sensitivity analysis...")
-    sensitivity_analyzer = SensitivityAnalysis(params)
-    
+    # Task 5: Sensitivity analysis
+    print("\n5. Running sensitivity analysis...")
     try:
-        # Sobol sensitivity analysis (reduced samples for demo)
-        n_samples = int(os.getenv('N_SAMPLES', '100'))
-        print(f"   Running Sobol sensitivity analysis (n={n_samples})...")
+        sensitivity_analyzer = SensitivityAnalysis(params)
         
-        with timeout_context(300):  # 5 minute timeout for sensitivity analysis
-            sobol_results = sensitivity_analyzer.sobol_sensitivity_analysis(n_samples=n_samples)
-        
-        if sobol_results:
-            fig = visualizer.plot_sensitivity_analysis(sobol_results)
-            plt.savefig('figures/sensitivity_analysis.png', dpi=300, bbox_inches='tight')
-            plt.close()
+        with timeout_context(max_time // 4):
+            sensitivity_results = sensitivity_analyzer.sobol_sensitivity_analysis()
             
-            print("   Top sensitive parameters:")
-            for metric, data in sobol_results.items():
-                if 'first_order' in data:
-                    sorted_params = sorted(data['first_order'].items(), 
-                                         key=lambda x: abs(x[1]), reverse=True)
-                    print(f"      {metric}:")
-                    for param, index in sorted_params[:3]:
-                        print(f"         {param}: {index:.3f}")
-    
+        if sensitivity_results:
+            # Visualize sensitivity results
+            fig = visualizer.plot_sensitivity_analysis(sensitivity_results)
+            plt.savefig("sensitivity_analysis.png", dpi=150, bbox_inches='tight')
+            plt.close(fig)
+        else:
+            print("   No sensitivity results generated")
+            
     except Exception as e:
-        print(f"   Error in sensitivity analysis: {e}")
+        print(f"   Sensitivity analysis error: {e}")
     
-    # Uncertainty quantification
-    print("\n7. Uncertainty quantification...")
+    # Task 6: Monte Carlo uncertainty analysis
+    print("\n6. Running Monte Carlo uncertainty analysis...")
     try:
-        n_samples_mc = int(os.getenv('N_SAMPLES', '100'))
-        print(f"   Running Monte Carlo uncertainty analysis (n={n_samples_mc})...")
-        
-        with timeout_context(300):  # 5 minute timeout for Monte Carlo
-            mc_results = sensitivity_analyzer.monte_carlo_uncertainty(n_samples=n_samples_mc)
-        
+        with timeout_context(max_time // 4):
+            mc_results = sensitivity_analyzer.monte_carlo_uncertainty()
+            
         if mc_results:
-            bounds = sensitivity_analyzer.calculate_uncertainty_bounds(mc_results)
+            uncertainty_bounds = sensitivity_analyzer.calculate_uncertainty_bounds(mc_results)
             
-            fig = visualizer.plot_uncertainty_analysis(mc_results, bounds)
-            plt.savefig('figures/uncertainty_analysis.png', dpi=300, bbox_inches='tight')
-            plt.close()
+            # Visualize uncertainty results
+            fig = visualizer.plot_uncertainty_analysis(uncertainty_bounds)
+            plt.savefig("uncertainty_analysis.png", dpi=150, bbox_inches='tight')
+            plt.close(fig)
+        else:
+            print("   No Monte Carlo results generated")
             
-            print("   Uncertainty bounds (95% CI):")
-            for metric, bound_data in bounds.items():
-                print(f"      {metric}: [{bound_data['lower']:.3f}, {bound_data['upper']:.3f}] "
-                      f"(mean: {bound_data['mean']:.3f})")
-    
     except Exception as e:
-        print(f"   Error in uncertainty analysis: {e}")
+        print(f"   Monte Carlo analysis error: {e}")
     
-    # Task 6: Policy recommendations
-    print("\n8. Policy Recommendations:")
-    print("   Based on the mathematical analysis:")
-    
-    print("\n   a) Critical Temperature Thresholds:")
-    if critical_points:
-        for cp in critical_points:
-            print(f"      - System becomes unstable above {cp['temperature']:.1f}°C")
-            print("        → Implement early warning systems at this threshold")
-    
-    print("\n   b) Network-Based Interventions:")
-    print("      - Maintain network connectivity above k_avg = 6.0 to prevent fragmentation")
-    print("      - Focus social support programs on high-clustering communities")
-    print("      - Implement redundant communication pathways before heatwave seasons")
-    
-    print("\n   c) Optimal Control Strategies:")
-    if 'strategy_comparison' in locals():
-        best_strategy = min(strategy_comparison.items(), 
-                          key=lambda x: x[1].get('total_infections', float('inf')))
-        print(f"      - {best_strategy[0]} strategy shows best performance")
-        print("      - Balance medical interventions with social support")
-        print("      - Climate mitigation provides long-term benefits")
-    
-    print("\n   d) Early Warning Indicators:")
-    print("      - Monitor R₀ approaching 1.0 combined with temperature > 32°C")
-    print("      - Track network degree decline > 20% as resilience failure signal")
-    print("      - Use clustering coefficient < 0.15 as intervention trigger")
+    # Task 7: Optimal control (skip in quick mode)
+    if not quick_mode:
+        print("\n7. Running optimal control analysis...")
+        try:
+            control_model = OptimalControlModel(params)
+            
+            with timeout_context(max_time // 4):
+                control_results = control_model.optimize_control_strategy()
+                
+            if control_results:
+                # Visualize control results
+                fig = visualizer.plot_optimal_control(control_results)
+                plt.savefig("optimal_control.png", dpi=150, bbox_inches='tight')
+                plt.close(fig)
+            else:
+                print("   No control results generated")
+                
+        except Exception as e:
+            print(f"   Optimal control error: {e}")
+    else:
+        print("\n7. Skipping optimal control (quick mode)")
     
     print("\n" + "=" * 60)
-    print("Analysis Complete! Check generated plots for detailed results.")
+    print("Analysis completed!")
     print("=" * 60)
+    
+    return True
 
 if __name__ == "__main__":
     main()

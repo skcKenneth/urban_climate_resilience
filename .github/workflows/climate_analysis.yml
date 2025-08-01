@@ -21,18 +21,28 @@ permissions:
 jobs:
   climate-analysis:
     runs-on: ubuntu-latest
-    timeout-minutes: 180  # 3 hours max
+    timeout-minutes: 120  # Reduced from 180 to 120 minutes
+    
+    strategy:
+      matrix:
+        python-version: ['3.11']
+        # Add parallel execution for different analysis types
+        analysis-type: ['quick', 'full']
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4  # ✅ Updated to v4 (latest)
+      uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        # Use shallow clone for faster checkout
+        fetch-depth: 1
     
     - name: Set up Python
-      uses: actions/setup-python@v5  # ✅ Updated to v5 (latest)
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.11'  # ✅ Updated to Python 3.11 for better performance
+        python-version: ${{ matrix.python-version }}
+        # Enable caching for Python installation
+        cache: 'pip'
     
     - name: Install system dependencies
       run: |
@@ -40,75 +50,94 @@ jobs:
         sudo apt-get install -y build-essential gfortran libopenblas-dev
         # Remove problematic emoji fonts that cause matplotlib issues
         sudo apt-get remove -y fonts-noto-color-emoji || true
+        # Install additional system dependencies for better performance
+        sudo apt-get install -y libatlas-base-dev liblapack-dev
     
     - name: Cache pip dependencies
-      uses: actions/cache@v4  # ✅ Updated to v4 (latest with new cache service)
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}-${{ matrix.analysis-type }}
         restore-keys: |
+          ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}-
           ${{ runner.os }}-pip-
     
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install --no-cache-dir -r requirements.txt
         # Install additional packages for GitHub Actions
         pip install psutil
+        # Install performance monitoring tools
+        pip install memory-profiler
     
     - name: Create results directory
       run: |
         mkdir -p results/$(date +%Y-%m-%d)
         echo "RESULTS_DIR=results/$(date +%Y-%m-%d)" >> $GITHUB_ENV
+        echo "ANALYSIS_TYPE=${{ matrix.analysis-type }}" >> $GITHUB_ENV
     
-    - name: Run automated climate analysis
+    - name: Run optimized climate analysis
       run: |
         # Set matplotlib backend before running
         export MPLBACKEND=Agg
         export MPLCONFIGDIR=/tmp
-        # Limit threads for memory efficiency
+        # Optimize for GitHub Actions environment
         export OMP_NUM_THREADS=2
         export MKL_NUM_THREADS=2
-        python auto_run.py 2>&1 | tee ${{ env.RESULTS_DIR }}/execution_log.txt
+        export OPENBLAS_NUM_THREADS=2
+        export VECLIB_MAXIMUM_THREADS=2
+        # Set memory limits
+        export PYTHONMALLOC=malloc
+        export PYTHONUNBUFFERED=1
+        
+        # Run with optimized settings
+        python auto_run.py --analysis-type ${{ matrix.analysis-type }} 2>&1 | tee ${{ env.RESULTS_DIR }}/execution_log_${{ matrix.analysis-type }}.txt
       env:
         # Set environment variables for GitHub Actions
         GITHUB_ACTIONS: true
         PYTHONPATH: ${{ github.workspace }}
-      timeout-minutes: 60  # Shorter timeout to prevent hanging
+        # Memory optimization
+        PYTHONMALLOC: malloc
+        # Analysis type specific settings
+        QUICK_MODE: ${{ matrix.analysis-type == 'quick' && 'true' || 'false' }}
+      timeout-minutes: 45  # Reduced timeout for each analysis type
     
     - name: Collect results
       run: |
-        # Move generated files to results directory
-        find . -name "*.png" -exec mv {} ${{ env.RESULTS_DIR }}/ \; 2>/dev/null || true
-        mv debug_log.txt ${{ env.RESULTS_DIR }}/ 2>/dev/null || true
-        mv error_state.json ${{ env.RESULTS_DIR }}/ 2>/dev/null || true
+        # Move generated files to results directory with analysis type prefix
+        find . -name "*.png" -exec mv {} ${{ env.RESULTS_DIR }}/${{ matrix.analysis-type }}_ \; 2>/dev/null || true
+        mv debug_log.txt ${{ env.RESULTS_DIR }}/debug_log_${{ matrix.analysis-type }}.txt 2>/dev/null || true
+        mv error_state.json ${{ env.RESULTS_DIR }}/error_state_${{ matrix.analysis-type }}.json 2>/dev/null || true
         
         # Create summary report
-        echo "# Climate Analysis Results - $(date)" > ${{ env.RESULTS_DIR }}/README.md
-        echo "" >> ${{ env.RESULTS_DIR }}/README.md
-        echo "## Execution Summary" >> ${{ env.RESULTS_DIR }}/README.md
-        echo "- **Date**: $(date)" >> ${{ env.RESULTS_DIR }}/README.md
-        echo "- **Status**: $([ -f ${{ env.RESULTS_DIR }}/epidemic_dynamics_baseline.png ] && echo 'SUCCESS ✅' || echo 'PARTIAL/FAILED ❌')" >> ${{ env.RESULTS_DIR }}/README.md
-        echo "- **Generated Files**: $(ls -1 ${{ env.RESULTS_DIR }}/*.png 2>/dev/null | wc -l) plots" >> ${{ env.RESULTS_DIR }}/README.md
-        echo "- **Runner**: ${{ runner.os }} (${{ runner.arch }})" >> ${{ env.RESULTS_DIR }}/README.md
-        echo "" >> ${{ env.RESULTS_DIR }}/README.md
-        echo "## Generated Visualizations" >> ${{ env.RESULTS_DIR }}/README.md
-        for file in ${{ env.RESULTS_DIR }}/*.png; do
+        echo "# Climate Analysis Results - $(date)" > ${{ env.RESULTS_DIR }}/README_${{ matrix.analysis-type }}.md
+        echo "" >> ${{ env.RESULTS_DIR }}/README_${{ matrix.analysis-type }}.md
+        echo "## Execution Summary" >> ${{ env.RESULTS_DIR }}/README_${{ matrix.analysis-type }}.md
+        echo "- **Date**: $(date)" >> ${{ env.RESULTS_DIR }}/README_${{ matrix.analysis-type }}.md
+        echo "- **Analysis Type**: ${{ matrix.analysis-type }}" >> ${{ env.RESULTS_DIR }}/README_${{ matrix.analysis-type }}.md
+        echo "- **Status**: $([ -f ${{ env.RESULTS_DIR }}/${{ matrix.analysis-type }}_epidemic_dynamics_baseline.png ] && echo 'SUCCESS ✅' || echo 'PARTIAL/FAILED ❌')" >> ${{ env.RESULTS_DIR }}/README_${{ matrix.analysis-type }}.md
+        echo "- **Generated Files**: $(ls -1 ${{ env.RESULTS_DIR }}/${{ matrix.analysis-type }}_*.png 2>/dev/null | wc -l) plots" >> ${{ env.RESULTS_DIR }}/README_${{ matrix.analysis-type }}.md
+        echo "- **Runner**: ${{ runner.os }} (${{ runner.arch }})" >> ${{ env.RESULTS_DIR }}/README_${{ matrix.analysis-type }}.md
+        echo "" >> ${{ env.RESULTS_DIR }}/README_${{ matrix.analysis-type }}.md
+        echo "## Generated Visualizations" >> ${{ env.RESULTS_DIR }}/README_${{ matrix.analysis-type }}.md
+        for file in ${{ env.RESULTS_DIR }}/${{ matrix.analysis-type }}_*.png; do
           if [ -f "$file" ]; then
             filename=$(basename "$file")
-            echo "- ![${filename}](${filename})" >> ${{ env.RESULTS_DIR }}/README.md
+            echo "- ![${filename}](${filename})" >> ${{ env.RESULTS_DIR }}/README_${{ matrix.analysis-type }}.md
           fi
         done
     
     - name: Upload results as artifacts
-      uses: actions/upload-artifact@v4  # ✅ Updated to v4 (latest, much faster uploads)
+      uses: actions/upload-artifact@v4
       with:
-        name: climate-analysis-results-${{ github.run_number }}
+        name: climate-analysis-results-${{ matrix.analysis-type }}-${{ github.run_number }}
         path: results/
         retention-days: 30
-        compression-level: 6  # ✅ New v4 feature for optimized compression
+        compression-level: 6
     
     - name: Commit and push results
+      if: matrix.analysis-type == 'full'  # Only commit full analysis results
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
@@ -120,10 +149,10 @@ jobs:
     
     - name: Create issue on failure
       if: failure()
-      uses: actions/github-script@v7  # ✅ Updated to v7 (latest)
+      uses: actions/github-script@v7
       with:
         script: |
-          github.rest.issues.create({  // ✅ Updated syntax for v7 (github.rest.* instead of github.*)
+          github.rest.issues.create({
             owner: context.repo.owner,
             repo: context.repo.repo,
             title: '🚨 Climate Analysis Failed - ' + new Date().toISOString().split('T')[0],
@@ -132,6 +161,7 @@ jobs:
             **Run Details:**
             - Run ID: ${{ github.run_id }}
             - Run Number: ${{ github.run_number }}
+            - Analysis Type: ${{ matrix.analysis-type }}
             - Commit: ${{ github.sha }}
             - Workflow: ${{ github.workflow }}
             - Runner: ${{ runner.os }} (${{ runner.arch }})
