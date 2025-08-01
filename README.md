@@ -1,161 +1,144 @@
-# Urban Climate-Social Network Resilience System
+# Urban Climate Resilience Analysis
 
-![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Analysis](https://img.shields.io/badge/Analysis-Automated-green.svg)
-![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)
-
-A comprehensive mathematical modeling framework for analyzing the coupled dynamics of climate change, epidemiological spread, and social network evolution in urban environments.
+A comprehensive mathematical modeling framework for analyzing coupled climate-epidemic-network dynamics in urban environments.
 
 ## Overview
 
-This project implements a sophisticated mathematical model that integrates:
-- Climate-forced epidemiological dynamics (modified SEIR)
-- Dynamic social network evolution
+This project implements sophisticated mathematical models to study:
+- Climate-forced epidemiological dynamics (modified SEIR model)
+- Dynamic social network evolution under climate stress
 - Coupled system behavior with feedback loops
-- Optimal control for resource allocation
+- Optimal control strategies for resource allocation
 - Stability and bifurcation analysis
-- Comprehensive sensitivity analysis and uncertainty quantification
+- Comprehensive sensitivity analysis
 
 ## Installation
 
+### Local Setup
 ```bash
-git clone https://github.com/yourusername/urban-climate-resilience.git
-cd urban-climate-resilience
+git clone https://github.com/yourusername/urban_climate_resilience.git
+cd urban_climate_resilience
 pip install -r requirements.txt
 ```
 
-## Usage
+### Requirements
+- Python 3.10+
+- NumPy, SciPy, Matplotlib
+- NetworkX, Pandas, Seaborn
+- scikit-learn, joblib, psutil
 
-### Quick Start
+## Running Analyses
 
-Run a quick baseline analysis:
+### Quick Analysis (Testing)
 ```bash
-python main.py --analysis-type quick --quick-mode
+# Run baseline scenario (90 days, 5000 population)
+python main.py --quick-mode
+
+# Run specific scenario
+python main.py --analysis-type heatwave --quick-mode
 ```
 
-### Full Analysis
-
-Run the complete analysis suite:
+### Full Paper Analysis (Local)
 ```bash
-python main.py --analysis-type full
+# Run complete analysis for paper (365 days, 10000 population)
+python run_full_analysis.py
+
+# Results will be in paper_results/ directory
 ```
 
-### Specific Scenarios
+## GitHub Actions - Automated Analysis
 
-Analyze specific climate scenarios:
-```bash
-# Baseline scenario
-python main.py --analysis-type baseline
+### Running Quick Analysis (Default)
+1. Go to **Actions** tab in GitHub
+2. Select **Climate Analysis** workflow
+3. Click **Run workflow**
+4. Keep default settings:
+   - Analysis mode: `quick`
+   - Scenario type: `baseline`
+5. Click **Run workflow** button
 
-# Heatwave scenario  
-python main.py --analysis-type heatwave
+### Running Full Paper Analysis
+1. Go to **Actions** tab
+2. Select **Climate Analysis** workflow  
+3. Click **Run workflow**
+4. Change settings:
+   - Analysis mode: **`paper`** (IMPORTANT!)
+5. Click **Run workflow** button
+6. Wait ~30-60 minutes for completion
 
-# Extreme climate scenario
-python main.py --analysis-type extreme
-```
+### What Gets Generated
 
-### Command-Line Options
+#### Quick Mode:
+- `{scenario}_epidemic.png` - Epidemic dynamics visualization
+- `{scenario}_data.npz` - Simulation data
+- `{scenario}_summary.txt` - Summary statistics
 
-```bash
-python main.py [OPTIONS]
+#### Paper Mode (Full Analysis):
+- **Epidemic Dynamics**: 
+  - `baseline_epidemic_dynamics.png`
+  - `heatwave_epidemic_dynamics.png`
+  - `extreme_epidemic_dynamics.png`
+- **Stability Analysis**:
+  - `stability_analysis.png` - Eigenvalue analysis
+  - `bifurcation_diagram.png` - Temperature bifurcation
+- **Sensitivity Analysis**:
+  - `morris_sensitivity.png` - Morris screening results
+  - `sobol_sensitivity.png` - Sobol indices heatmap
+- **Comparison & Phase Portraits**:
+  - `scenario_comparison.png` - All scenarios comparison
+  - `phase_portrait_I_k.png` - Infected vs connectivity
+  - `phase_portrait_I_C.png` - Infected vs clustering
+- **Optimal Control**:
+  - `optimal_control_strategies.png` - Control inputs over time
+  - `controlled_vs_uncontrolled.png` - Impact comparison
+- **Data & Reports**:
+  - `{scenario}_results.npz` - Full simulation data
+  - `paper_analysis_summary.txt` - Complete summary
 
-Options:
-  --analysis-type {full,baseline,heatwave,extreme,quick}
-                        Type of analysis to run (default: full)
-  --quick-mode          Run in quick mode with reduced parameters
-  --parallel            Use parallel processing where available
-  --output-dir DIR      Directory for output files (default: results)
-```
+### Downloading Results
 
-### Environment Variables
-
-You can customize the analysis using environment variables:
-- `QUICK_MODE`: Set to 'true' for quick runs
-- `MAX_TIME`: Maximum time in seconds for analysis (default: 3600)
-- `N_SAMPLES`: Number of samples for sensitivity analysis (default: 500)
-- `SIMULATION_DAYS`: Number of days to simulate (default: 365)
+1. After workflow completes, click on the run
+2. Scroll to **Artifacts** section
+3. Download `analysis-results-{number}.zip`
+4. Extract to get all figures and data
 
 ## Project Structure
 
 ```
-urban-climate-resilience/
-├── main.py                 # Main entry point with CLI
+urban_climate_resilience/
 ├── models/                 # Mathematical models
-│   ├── coupled_system.py   # Coupled climate-epidemic-network model
-│   ├── epidemiological_model.py  # SEIR model with climate forcing
-│   ├── network_model.py    # Dynamic social network model
-│   └── optimal_control.py  # Optimal control strategies
-├── analysis/               # Analysis modules
-│   ├── stability_analysis.py     # Stability and bifurcation analysis
-│   ├── sensitivity_analysis.py   # Sensitivity analysis
-│   └── control_analysis.py       # Control strategy analysis
-├── utils/                  # Utility modules
-│   ├── parameters.py       # Model parameters
-│   ├── visualization.py    # Plotting and visualization
-│   ├── data_generator.py   # Climate scenario generation
-│   └── debug.py            # Debug utilities
-├── .github/workflows/      # GitHub Actions
-│   └── climate_analysis.yml  # Automated analysis workflow
-└── test_quick_run.py       # Quick test script
+│   ├── coupled_system.py   # Main coupled dynamics
+│   ├── epidemiological_model.py  # SEIR with climate
+│   ├── network_model.py    # Dynamic networks
+│   └── optimal_control.py  # Control strategies
+├── analysis/              # Analysis modules
+│   ├── stability_analysis.py
+│   ├── sensitivity_analysis.py
+│   └── control_analysis.py
+├── utils/                 # Utilities
+│   ├── parameters.py      # Model parameters
+│   ├── visualization.py   # Plotting functions
+│   └── data_generator.py  # Climate scenarios
+├── main.py               # Quick analysis entry
+├── run_full_analysis.py  # Full paper analysis
+└── .github/workflows/    # GitHub Actions
+
 ```
 
-## Output Files
+## Workflow Status
 
-The analysis generates the following visualizations in the output directory:
+[![Climate Analysis](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/climate_analysis.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/climate_analysis.yml)
 
-- `epidemic_<scenario>.png` - Epidemic dynamics for each scenario
-- `phase_portrait.png` - System phase space analysis
-- `bifurcation_diagram.png` - Temperature-dependent stability analysis
-- `sensitivity_analysis.png` - Parameter sensitivity results
+## Citation
 
-## GitHub Actions
-
-The repository includes automated analysis via GitHub Actions:
-- **Daily runs**: Automated analysis of all scenarios
-- **Push triggers**: Analysis runs on code changes
-- **Parallel execution**: Scenarios run in parallel for efficiency
-- **Artifact storage**: Results stored for 30 days
-
-## Mathematical Models
-
-### 1. Climate-Epidemiological Model
-- SEIR compartmental model with climate forcing
-- Temperature and humidity dependent transmission rates
-- Social behavior modifications under climate stress
-
-### 2. Dynamic Network Model
-- Scale-free network with geographic constraints
-- Climate-dependent edge formation and dissolution
-- Preferential attachment with environmental stress
-
-### 3. Coupled System Dynamics
-- Bidirectional coupling between epidemic and network
-- Network connectivity affects disease transmission
-- Disease prevalence influences social structure
-
-### 4. Optimal Control Framework
-- Multi-objective optimization for resource allocation
-- Medical, social, and climate mitigation interventions
-- Budget constraints and dynamic programming
-
-## Key Results
-
-The model reveals:
-- Critical temperature thresholds where system behavior changes dramatically
-- Optimal intervention strategies balancing health and social costs
-- Early warning indicators for system-wide resilience failures
-- Policy recommendations for urban planning and public health
-
-## Applications
-
-- Urban climate adaptation planning
-- Public health emergency preparedness
-- Social network intervention design
-- Resource allocation optimization
-- Early warning system development
+If you use this code in your research, please cite:
+```
+[Your Paper Title]
+[Authors]
+[Journal/Conference] [Year]
+```
 
 ## License
 
-MIT License - See LICENSE file for details
+MIT License - see LICENSE file for details.
 

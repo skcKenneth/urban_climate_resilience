@@ -1,218 +1,149 @@
-name: Urban Climate Resilience Analysis
+name: Climate Analysis
 
 on:
-  schedule:
-    # Run daily at 2 AM UTC
-    - cron: '0 2 * * *'
-  workflow_dispatch:
   push:
     branches: [ main ]
-    paths:
-      - '**.py'
-      - 'requirements.txt'
-      - '.github/workflows/**'
-
-permissions:
-  contents: write
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      analysis_mode:
+        description: 'Analysis mode'
+        required: true
+        default: 'quick'
+        type: choice
+        options:
+          - quick
+          - paper
+      analysis_type:
+        description: 'Scenario type (for quick mode)'
+        required: false
+        default: 'baseline'
+        type: choice
+        options:
+          - baseline
+          - heatwave
+          - extreme
 
 jobs:
-  # Quick test to ensure basic functionality
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'
-    
-    - name: Install dependencies
-      run: |
-        pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Run quick test
-      run: python test_quick_run.py
-      env:
-        MPLBACKEND: Agg
-        QUICK_MODE: true
-    
-    - name: Run full mode test (reduced)
-      run: |
-        # Create a reduced full mode test
-        cat << 'EOF' > test_full_reduced.py
-        import os
-        import sys
-        import subprocess
-        
-        # Set reduced parameters for CI
-        env = os.environ.copy()
-        env['QUICK_MODE'] = 'false'
-        env['MAX_TIME'] = '300'
-        env['N_SAMPLES'] = '50'
-        env['SIMULATION_DAYS'] = '90'
-        env['MPLBACKEND'] = 'Agg'
-        
-        # Run full analysis with reduced parameters
-        result = subprocess.run([
-            sys.executable, 'main.py', '--analysis-type', 'full'
-        ], env=env)
-        
-        sys.exit(result.returncode)
-        EOF
-        
-        python test_full_reduced.py
-
-  # Main analysis job
   analysis:
-    needs: test
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      matrix:
-        scenario: ['baseline', 'heatwave', 'extreme']
-      fail-fast: false
+    timeout-minutes: 120  # 2 hours for full paper analysis
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.10'
         cache: 'pip'
+    
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
     
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential gfortran libopenblas-dev
+        sudo apt-get install -y python3-dev libopenblas-dev gfortran
     
     - name: Install Python dependencies
       run: |
-        pip install --upgrade pip
+        python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.txt
-        pip install psutil memory-profiler
+        echo "Installed packages:"
+        pip list
     
-    - name: Create results directory
+    - name: Verify imports
       run: |
-        mkdir -p results/${{ matrix.scenario }}
-        echo "RESULTS_DIR=results/${{ matrix.scenario }}" >> $GITHUB_ENV
+        python -c "import numpy; print(f'NumPy: {numpy.__version__}')"
+        python -c "import scipy; print(f'SciPy: {scipy.__version__}')"
+        python -c "import matplotlib; print(f'Matplotlib: {matplotlib.__version__}')"
+        python -c "import networkx; print(f'NetworkX: {networkx.__version__}')"
+        python -c "import psutil; print(f'psutil: {psutil.__version__}')"
     
-    - name: Run ${{ matrix.scenario }} analysis
-      run: |
-        python main.py \
-          --analysis-type ${{ matrix.scenario }} \
-          --output-dir ${{ env.RESULTS_DIR }}
+    - name: Run analysis
       env:
+        PYTHONPATH: ${{ github.workspace }}
         MPLBACKEND: Agg
-        PYTHONUNBUFFERED: 1
         OMP_NUM_THREADS: 2
-        MAX_TIME: 1800
-        N_SAMPLES: 200
-        SIMULATION_DAYS: 180
+      run: |
+        # Use workflow inputs or defaults
+        MODE="${{ github.event.inputs.analysis_mode || 'quick' }}"
+        TYPE="${{ github.event.inputs.analysis_type || 'baseline' }}"
+        
+        echo "Analysis mode: $MODE"
+        
+        if [ "$MODE" = "paper" ]; then
+          echo "Running FULL PAPER ANALYSIS (this will take 30-60 minutes)..."
+          python run_full_analysis.py --output-dir paper_results
+        else
+          echo "Running QUICK ANALYSIS (type: $TYPE)..."
+          python main.py --analysis-type $TYPE --quick-mode --output-dir results
+        fi
+    
+    - name: List results
+      if: always()
+      run: |
+        echo "=== Results ==="
+        if [ "${{ github.event.inputs.analysis_mode }}" = "paper" ]; then
+          if [ -d paper_results ]; then
+            echo "Paper results directory:"
+            ls -la paper_results/
+            echo ""
+            echo "PNG files generated:"
+            find paper_results -name "*.png" -type f | sort
+            echo ""
+            echo "Data files generated:"
+            find paper_results -name "*.npz" -type f | sort
+          else
+            echo "No paper_results directory found"
+          fi
+        else
+          if [ -d results ]; then
+            echo "Quick results directory:"
+            ls -la results/
+          else
+            echo "No results directory found"
+          fi
+        fi
     
     - name: Upload results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: results-${{ matrix.scenario }}
-        path: ${{ env.RESULTS_DIR }}
-        retention-days: 30
-
-  # Combine results and generate report
-  report:
-    needs: analysis
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: combined_results
-    
-    - name: Generate summary report
-      run: |
-        echo "# Climate Resilience Analysis Report" > REPORT.md
-        echo "Generated on: $(date)" >> REPORT.md
-        echo "" >> REPORT.md
-        
-        for scenario in baseline heatwave extreme; do
-          if [ -d "combined_results/results-$scenario" ]; then
-            echo "## $scenario Scenario" >> REPORT.md
-            echo "- ✅ Analysis completed" >> REPORT.md
-            ls -la combined_results/results-$scenario/*.png 2>/dev/null | wc -l | xargs -I {} echo "- {} visualizations generated" >> REPORT.md
-            echo "" >> REPORT.md
-          else
-            echo "## $scenario Scenario" >> REPORT.md
-            echo "- ❌ Analysis failed or incomplete" >> REPORT.md
-            echo "" >> REPORT.md
-          fi
-        done
-        
-        echo "## Artifacts" >> REPORT.md
-        echo "Results are available as workflow artifacts for 30 days." >> REPORT.md
-    
-    - name: Upload report
-      uses: actions/upload-artifact@v4
-      with:
-        name: analysis-report
+        name: analysis-results-${{ github.run_number }}
         path: |
-          REPORT.md
-          combined_results/**/*.png
+          results/
+          paper_results/
         retention-days: 30
-
-  # Full analysis (weekly)
-  full-analysis:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-    - uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'
-    
-    - name: Install dependencies
+    - name: Create summary
+      if: always()
       run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential gfortran libopenblas-dev
-        pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install psutil memory-profiler joblib
-    
-    - name: Run full analysis
-      run: |
-        python main.py \
-          --analysis-type full \
-          --parallel \
-          --output-dir results/full
-      env:
-        MPLBACKEND: Agg
-        PYTHONUNBUFFERED: 1
-        OMP_NUM_THREADS: 4
-        MAX_TIME: 7200
-        N_SAMPLES: 500
-        SIMULATION_DAYS: 365
-    
-    - name: Create release
-      if: success()
-      run: |
-        TAG="v$(date +%Y.%m.%d)"
-        echo "Creating release $TAG"
-        echo "TAG=$TAG" >> $GITHUB_ENV
-    
-    - name: Upload full results
-      uses: actions/upload-artifact@v4
-      if: success()
-      with:
-        name: full-analysis-results
-        path: results/full
-        retention-days: 90
+        MODE="${{ github.event.inputs.analysis_mode || 'quick' }}"
+        
+        echo "## Analysis Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Mode**: $MODE" >> $GITHUB_STEP_SUMMARY
+        echo "- **Run**: #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Time**: $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "$MODE" = "paper" ] && [ -f paper_results/paper_analysis_summary.txt ]; then
+          echo "### Paper Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat paper_results/paper_analysis_summary.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        elif [ -f results/*_summary.txt ]; then
+          echo "### Quick Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat results/*_summary.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
