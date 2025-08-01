@@ -223,20 +223,35 @@ def run_control_analysis(params, coupled_model, visualizer, max_time):
     
     try:
         with timeout_context(max_time):
-            control_model = OptimalControlModel(params)
-            control_results = control_model.optimize_control_strategy()
+            from analysis.control_analysis import ControlAnalysis
             
-        if control_results:
-            # Visualize control results
-            fig = visualizer.plot_optimal_control(control_results)
-            plt.savefig("optimal_control.png", dpi=150, bbox_inches='tight')
-            plt.close(fig)
-            print("   ✅ Control analysis completed")
-        else:
-            print("   ⚠️  No control results generated")
+            # Initialize control analysis
+            control_analyzer = ControlAnalysis(params=params)
+            
+            # Determine if quick mode based on max_time
+            quick_mode = max_time < 1800  # Quick mode if less than 30 minutes
+            
+            # Run control strategy comparison
+            results, summary = control_analyzer.run_control_comparison(
+                t_span=(0, params.T_sim),
+                quick_mode=quick_mode
+            )
+            
+            # Generate publication figures
+            control_analyzer.generate_publication_figures(results)
+            
+            # Run sensitivity analysis if time permits
+            if max_time > 3600:  # Only if more than 1 hour available
+                control_analyzer.run_optimal_control_sensitivity()
+            
+        print("   ✅ Control analysis completed")
+        print(f"   📊 Results saved to {control_analyzer.results_dir}")
+        print(f"   🎯 Best strategy: {summary.get('optimal', {}).get('rank', 'N/A')}")
             
     except Exception as e:
         print(f"   ❌ Control analysis error: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()

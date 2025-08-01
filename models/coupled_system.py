@@ -73,13 +73,16 @@ class CoupledSystemModel:
         
         return [dSdt, dEdt, dIdt, dRdt, dk_avg_dt, dCdt]
     
-    def solve_coupled_system(self, t_span, y0, T_func, H_func, controls=None):
+    def solve_coupled_system(self, t_span, y0, T_func, H_func, controls=None, t_eval=None):
         """Solve the coupled system"""
         def rhs(t, y):
             return self.coupled_derivatives(t, y, T_func, H_func, controls)
         
+        if t_eval is None:
+            t_eval = np.arange(t_span[0], t_span[1], self.params.dt)
+        
         sol = solve_ivp(rhs, t_span, y0,
-                       t_eval=np.arange(t_span[0], t_span[1], self.params.dt),
+                       t_eval=t_eval,
                        method='RK45', rtol=1e-6)
         
         return sol.t, sol.y
