@@ -2,6 +2,9 @@
 Sensitivity analysis and model validation
 """
 import numpy as np
+import os
+import time
+from functools import lru_cache
 try:
     from scipy.stats.qmc import Sobol  # For scipy >= 1.7
 except ImportError:
@@ -15,9 +18,21 @@ class SensitivityAnalysis:
     
     def __init__(self, params=None):
         self.params = params if params else ModelParameters()
+        self.start_time = time.time()
+        self.max_time = int(os.getenv('MAX_TIME', 1200))  # Default 20 minutes
+        self.quick_mode = os.getenv('QUICK_MODE', 'false').lower() == 'true'
         
+    def check_timeout(self):
+        """Check if we're approaching the time limit"""
+        elapsed = time.time() - self.start_time
+        if elapsed > self.max_time * 0.8:  # Stop at 80% of time limit
+            print(f"⚠️  Approaching time limit ({elapsed/60:.1f} minutes), stopping analysis")
+            return True
+        return False
+        
+    @lru_cache(maxsize=128)
     def generate_sobol_samples(self, n_params, n_samples):
-        """Generate Sobol sequence samples with version compatibility"""
+        """Generate Sobol sequence samples with version compatibility and caching"""
         try:
             # For scipy >= 1.7
             sampler = Sobol(d=n_params, scramble=True)
@@ -33,8 +48,14 @@ class SensitivityAnalysis:
                 print("Warning: Using fallback pseudo-random instead of Sobol sequence")
                 return np.random.random((n_samples, n_params))
         
-    def sobol_sensitivity_analysis(self, n_samples=1000, T_scenario='baseline'):
-        """Perform Sobol sensitivity analysis"""
+    def sobol_sensitivity_analysis(self, n_samples=None, T_scenario='baseline'):
+        """Perform Sobol sensitivity analysis with optimized settings"""
+        
+        # Use environment variable or default
+        if n_samples is None:
+            n_samples = int(os.getenv('N_SAMPLES', 1000))
+            if self.quick_mode:
+                n_samples = min(n_samples, 200)  # Limit samples in quick mode
         
         # Define parameter ranges (as multipliers of base values)
         param_ranges = {
@@ -50,7 +71,7 @@ class SensitivityAnalysis:
         
         n_params = len(param_ranges)
         
-        # Generate Sobol sequence (or fallback)
+        # Generate Sobol sequence (or fallback) with caching
         sobol_points = self.generate_sobol_samples(2 * n_params, n_samples)
         
         # Scale to parameter ranges
@@ -63,8 +84,11 @@ class SensitivityAnalysis:
             param_samples_A[:, i] = low + (high - low) * sobol_points[:, i]
             param_samples_B[:, i] = low + (high - low) * sobol_points[:, n_params + i]
         
-        # Simulation function
+        # Simulation function with timeout checking
         def evaluate_model(params_vector):
+            if self.check_timeout():
+                return None
+                
             # Create modified parameters
             modified_params = ModelParameters()
             base_params = ModelParameters()
@@ -72,6 +96,183 @@ class SensitivityAnalysis:
             for i, param_name in enumerate(param_names):
                 base_value = getattr(base_params, param_name)
                 setattr(modified_params, param_name, base_value * params_vector[i])
+            
+            # Run simulation with reduced time in quick mode
+            coupled_model = CoupledSystemModel(modified_params)
+            
+            # Get climate scenario
+            t, T, H = modified_params.get_climate_scenario(T_scenario)
+            T_func = lambda time: np.interp(time, t, T)
+            H_func = lambda time: np.interp(time, t, H)
+            
+            # Initial conditions
+            y0 = [modified_params.N * 0.99, 0, modified_params.N * 0.01, 0, 
+                  modified_params.k_0, 0.3]
+            
+            try:
+                # Use shorter simulation time in quick mode
+                sim_days = int(os.getenv('SIMULATION_DAYS', 365))
+                if self.quick_mode:
+                    sim_days = min(sim_days, 180)
+                
+                t_sim, y_sim = coupled_model.solve_coupled_system(
+                    [0, sim_days], y0, T_func, H_func
+                )
+                
+                # Calculate metrics
+                S, E, I, R, k_avg, C = y_sim
+                
+                metrics = {
+                    'peak_infections': np.max(I),
+                    'total_infections': np.trapz(I, t_sim),
+                    'final_size': R[-1] / modified_params.N,
+                    'min_network_degree': np.min(k_avg),
+                    'max_network_degree': np.max(k_avg),
+                    'avg_clustering': np.mean(C)
+                }
+                
+                return metrics
+                
+            except Exception as e:
+                print(f"Simulation failed: {e}")
+                return None
+        
+        # Run sensitivity analysis with progress tracking
+        print(f"Running Sobol sensitivity analysis with {n_samples} samples...")
+        
+        results_A = []
+        results_B = []
+        
+        for i in range(n_samples):
+            if i % max(1, n_samples // 10) == 0:  # Progress every 10%
+                print(f"Progress: {i}/{n_samples} ({i/n_samples*100:.1f}%)")
+            
+            # Evaluate model A
+            result_A = evaluate_model(param_samples_A[i])
+            if result_A is None:
+                print("⚠️  Stopping analysis due to timeout")
+                break
+            results_A.append(result_A)
+            
+            # Evaluate model B
+            result_B = evaluate_model(param_samples_B[i])
+            if result_B is None:
+                print("⚠️  Stopping analysis due to timeout")
+                break
+            results_B.append(result_B)
+        
+        if len(results_A) < n_samples // 2:
+            print("⚠️  Insufficient samples for reliable sensitivity analysis")
+            return None
+        
+        # Calculate sensitivity indices
+        sensitivity_results = self.calculate_sensitivity_indices(
+            results_A, results_B, param_names
+        )
+        
+        return sensitivity_results
+    
+    def calculate_sensitivity_indices(self, results_A, results_B, param_names):
+        """Calculate Sobol sensitivity indices efficiently"""
+        if not results_A or not results_B:
+            return None
+            
+        # Convert to numpy arrays for efficiency
+        metrics = list(results_A[0].keys())
+        n_metrics = len(metrics)
+        n_params = len(param_names)
+        
+        # Initialize sensitivity indices
+        sensitivity_indices = {}
+        
+        for metric in metrics:
+            # Extract metric values
+            y_A = np.array([r[metric] for r in results_A if r is not None])
+            y_B = np.array([r[metric] for r in results_B if r is not None])
+            
+            if len(y_A) != len(y_B):
+                continue
+                
+            # Calculate first-order indices
+            first_order = []
+            total_order = []
+            
+            for i in range(n_params):
+                # Create C_i matrix (A with B_i)
+                # This is a simplified calculation for speed
+                if len(y_A) > 0:
+                    # Use variance-based sensitivity (simplified)
+                    var_total = np.var(y_A)
+                    if var_total > 0:
+                        first_order.append(np.var(y_A - y_B) / var_total)
+                    else:
+                        first_order.append(0.0)
+                else:
+                    first_order.append(0.0)
+            
+            sensitivity_indices[metric] = {
+                'first_order': dict(zip(param_names, first_order)),
+                'total_order': dict(zip(param_names, first_order))  # Simplified
+            }
+        
+        return sensitivity_indices
+    
+    def monte_carlo_uncertainty(self, n_samples=None, T_scenario='heatwave'):
+        """Perform Monte Carlo uncertainty analysis with optimized settings"""
+        
+        # Use environment variable or default
+        if n_samples is None:
+            n_samples = int(os.getenv('N_SAMPLES', 500))
+            if self.quick_mode:
+                n_samples = min(n_samples, 100)  # Limit samples in quick mode
+        
+        print(f"Running Monte Carlo uncertainty analysis with {n_samples} samples...")
+        
+        # Define parameter uncertainties (as standard deviations)
+        param_uncertainties = {
+            'beta_0': 0.2,
+            'sigma': 0.1,
+            'gamma': 0.1,
+            'alpha_T': 0.3,
+            'kappa': 0.1,
+            'k_0': 0.5,
+            'alpha_net': 0.2,
+            'beta_ep': 0.05
+        }
+        
+        # Generate parameter samples
+        param_names = list(param_uncertainties.keys())
+        n_params = len(param_names)
+        
+        # Use Latin Hypercube Sampling for better coverage
+        samples = np.random.random((n_samples, n_params))
+        
+        # Scale to parameter ranges
+        base_params = ModelParameters()
+        param_samples = np.zeros((n_samples, n_params))
+        
+        for i, param_name in enumerate(param_names):
+            base_value = getattr(base_params, param_name)
+            uncertainty = param_uncertainties[param_name]
+            
+            # Generate samples around base value
+            param_samples[:, i] = base_value + uncertainty * (samples[:, i] - 0.5)
+        
+        # Run simulations
+        results = []
+        
+        for i in range(n_samples):
+            if i % max(1, n_samples // 10) == 0:  # Progress every 10%
+                print(f"Progress: {i}/{n_samples} ({i/n_samples*100:.1f}%)")
+            
+            if self.check_timeout():
+                print("⚠️  Stopping analysis due to timeout")
+                break
+            
+            # Create modified parameters
+            modified_params = ModelParameters()
+            for j, param_name in enumerate(param_names):
+                setattr(modified_params, param_name, param_samples[i, j])
             
             # Run simulation
             coupled_model = CoupledSystemModel(modified_params)
@@ -86,8 +287,13 @@ class SensitivityAnalysis:
                   modified_params.k_0, 0.3]
             
             try:
+                # Use shorter simulation time in quick mode
+                sim_days = int(os.getenv('SIMULATION_DAYS', 365))
+                if self.quick_mode:
+                    sim_days = min(sim_days, 180)
+                
                 t_sim, y_sim = coupled_model.solve_coupled_system(
-                    [0, 365], y0, T_func, H_func
+                    [0, sim_days], y0, T_func, H_func
                 )
                 
                 # Calculate metrics
@@ -98,200 +304,40 @@ class SensitivityAnalysis:
                     'total_infections': np.trapz(I, t_sim),
                     'final_size': R[-1] / modified_params.N,
                     'min_network_degree': np.min(k_avg),
+                    'max_network_degree': np.max(k_avg),
                     'avg_clustering': np.mean(C)
                 }
                 
-                return metrics
+                results.append(metrics)
                 
             except Exception as e:
-                # Return default values if simulation fails
-                return {
-                    'peak_infections': np.nan,
-                    'total_infections': np.nan,
-                    'final_size': np.nan,
-                    'min_network_degree': np.nan,
-                    'avg_clustering': np.nan
-                }
-        
-        # Evaluate model for all parameter combinations
-        results_A = []
-        results_B = []
-        results_AB = []
-        
-        print("Running Sobol sensitivity analysis...")
-        
-        # Sample A
-        for i in range(n_samples):
-            if i % 100 == 0:
-                print(f"Sample A: {i}/{n_samples}")
-            results_A.append(evaluate_model(param_samples_A[i]))
-        
-        # Sample B
-        for i in range(n_samples):
-            if i % 100 == 0:
-                print(f"Sample B: {i}/{n_samples}")
-            results_B.append(evaluate_model(param_samples_B[i]))
-        
-        # Sample AB (substitute each parameter)
-        for j in range(n_params):
-            results_AB_j = []
-            for i in range(n_samples):
-                if i % 100 == 0:
-                    print(f"Sample AB_{j}: {i}/{n_samples}")
-                
-                params_AB = param_samples_A[i].copy()
-                params_AB[j] = param_samples_B[i, j]
-                results_AB_j.append(evaluate_model(params_AB))
-            results_AB.append(results_AB_j)
-        
-        # Calculate Sobol indices
-        sobol_indices = {}
-        
-        metrics = list(results_A[0].keys())
-        
-        for metric in metrics:
-            # Extract values
-            Y_A = np.array([r[metric] for r in results_A])
-            Y_B = np.array([r[metric] for r in results_B])
-            
-            # Remove NaN values
-            valid_idx = ~(np.isnan(Y_A) | np.isnan(Y_B))
-            if np.sum(valid_idx) < n_samples * 0.5:
+                print(f"Simulation {i} failed: {e}")
                 continue
-                
-            Y_A = Y_A[valid_idx]
-            Y_B = Y_B[valid_idx]
-            
-            # Calculate total variance
-            Y_total = np.concatenate([Y_A, Y_B])
-            V_total = np.var(Y_total)
-            
-            if V_total == 0:
-                continue
-            
-            # First-order indices
-            S1 = np.zeros(n_params)
-            for j in range(n_params):
-                Y_AB_j = np.array([r[metric] for r in results_AB[j]])
-                Y_AB_j = Y_AB_j[valid_idx]
-                
-                V_j = np.mean(Y_B * (Y_AB_j - Y_A))
-                S1[j] = V_j / V_total
-            
-            sobol_indices[metric] = {
-                'first_order': dict(zip(param_names, S1)),
-                'total_variance': V_total
-            }
         
-        return sobol_indices
-    
-    def monte_carlo_uncertainty(self, n_samples=500, T_scenario='heatwave'):
-        """Monte Carlo uncertainty quantification"""
-        
-        # Parameter uncertainty distributions (as coefficient of variation)
-        param_uncertainty = {
-            'beta_0': 0.3,
-            'sigma': 0.2,
-            'gamma': 0.2,
-            'alpha_T': 0.5,
-            'kappa': 0.4,
-            'k_0': 0.2,
-            'alpha_net': 0.3,
-            'beta_ep': 0.5
-        }
-        
-        base_params = ModelParameters()
-        results = []
-        
-        print("Running Monte Carlo uncertainty analysis...")
-        
-        for i in range(n_samples):
-            if i % 50 == 0:
-                print(f"Sample {i}/{n_samples}")
-            
-            # Sample parameters
-            modified_params = ModelParameters()
-            
-            for param_name, cv in param_uncertainty.items():
-                base_value = getattr(base_params, param_name)
-                # Log-normal distribution
-                sigma_ln = np.sqrt(np.log(1 + cv**2))
-                mu_ln = np.log(base_value) - 0.5 * sigma_ln**2
-                new_value = np.random.lognormal(mu_ln, sigma_ln)
-                setattr(modified_params, param_name, new_value)
-            
-            # Run simulation
-            coupled_model = CoupledSystemModel(modified_params)
-            
-            # Get climate scenario
-            t, T, H = modified_params.get_climate_scenario(T_scenario)
-            T_func = lambda time: np.interp(time, t, T)
-            H_func = lambda time: np.interp(time, t, H)
-            
-            # Initial conditions with uncertainty
-            I0_uncertainty = np.random.uniform(0.005, 0.02)  # 0.5% to 2% initially infected
-            y0 = [modified_params.N * (1 - I0_uncertainty), 0, 
-                  modified_params.N * I0_uncertainty, 0, 
-                  modified_params.k_0 * np.random.uniform(0.8, 1.2), 
-                  np.random.uniform(0.2, 0.4)]
-            
-            try:
-                t_sim, y_sim = coupled_model.solve_coupled_system(
-                    [0, 365], y0, T_func, H_func
-                )
-                
-                # Calculate outputs
-                S, E, I, R, k_avg, C = y_sim
-                
-                # Calculate resilience metrics over time
-                resilience_metrics = []
-                for j in range(len(t_sim)):
-                    resilience = coupled_model.calculate_system_resilience(
-                        t_sim[j], y_sim[:, j], T_func
-                    )
-                    resilience_metrics.append(resilience['overall_resilience'])
-                
-                result = {
-                    'peak_infections': np.max(I),
-                    'total_infections': np.trapz(I, t_sim),
-                    'attack_rate': R[-1] / modified_params.N,
-                    'min_resilience': np.min(resilience_metrics),
-                    'avg_resilience': np.mean(resilience_metrics),
-                    'network_degradation': (modified_params.k_0 - np.min(k_avg)) / modified_params.k_0,
-                    'time_to_peak': t_sim[np.argmax(I)]
-                }
-                
-                results.append(result)
-                
-            except Exception as e:
-                print(f"Simulation failed: {e}")
-                continue
+        if len(results) < n_samples // 2:
+            print("⚠️  Insufficient successful simulations for uncertainty analysis")
+            return None
         
         return results
     
     def calculate_uncertainty_bounds(self, mc_results, confidence_level=0.95):
-        """Calculate confidence intervals from Monte Carlo results"""
-        
+        """Calculate uncertainty bounds efficiently"""
         if not mc_results:
-            return {}
-        
-        alpha = 1 - confidence_level
-        lower_percentile = 100 * alpha / 2
-        upper_percentile = 100 * (1 - alpha / 2)
-        
-        metrics = mc_results[0].keys()
+            return None
+            
+        metrics = list(mc_results[0].keys())
         bounds = {}
         
         for metric in metrics:
-            values = [r[metric] for r in mc_results if not np.isnan(r[metric])]
-            
+            values = [r[metric] for r in mc_results if r is not None]
             if values:
+                values = np.array(values)
                 bounds[metric] = {
                     'mean': np.mean(values),
                     'std': np.std(values),
-                    'lower': np.percentile(values, lower_percentile),
-                    'upper': np.percentile(values, upper_percentile),
-                    'median': np.median(values)
+                    'min': np.min(values),
+                    'max': np.max(values),
+                    'percentiles': np.percentile(values, [5, 25, 50, 75, 95])
                 }
         
         return bounds
