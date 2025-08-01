@@ -5,3 +5,4 @@ networkx
 pandas
 seaborn
 scikit-learn
+joblib
