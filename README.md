@@ -1,85 +1,144 @@
 # Urban Climate Resilience Analysis
 
-A mathematical modeling system for analyzing urban climate-social network resilience.
+A comprehensive mathematical modeling framework for analyzing coupled climate-epidemic-network dynamics in urban environments.
 
-## Quick Start
+## Overview
 
-### Local Installation
+This project implements sophisticated mathematical models to study:
+- Climate-forced epidemiological dynamics (modified SEIR model)
+- Dynamic social network evolution under climate stress
+- Coupled system behavior with feedback loops
+- Optimal control strategies for resource allocation
+- Stability and bifurcation analysis
+- Comprehensive sensitivity analysis
+
+## Installation
+
+### Local Setup
 ```bash
+git clone https://github.com/yourusername/urban_climate_resilience.git
+cd urban_climate_resilience
 pip install -r requirements.txt
 ```
 
-### Run Quick Test
+### Requirements
+- Python 3.10+
+- NumPy, SciPy, Matplotlib
+- NetworkX, Pandas, Seaborn
+- scikit-learn, joblib, psutil
+
+## Running Analyses
+
+### Quick Analysis (Testing)
 ```bash
+# Run baseline scenario (90 days, 5000 population)
 python main.py --quick-mode
+
+# Run specific scenario
+python main.py --analysis-type heatwave --quick-mode
 ```
 
-### Run Full Analysis for Paper
+### Full Paper Analysis (Local)
 ```bash
+# Run complete analysis for paper (365 days, 10000 population)
 python run_full_analysis.py
+
+# Results will be in paper_results/ directory
 ```
 
 ## GitHub Actions - Automated Analysis
 
-The project includes automated CI/CD that runs your full analysis on GitHub's servers.
+### Running Quick Analysis (Default)
+1. Go to **Actions** tab in GitHub
+2. Select **Climate Analysis** workflow
+3. Click **Run workflow**
+4. Keep default settings:
+   - Analysis mode: `quick`
+   - Scenario type: `baseline`
+5. Click **Run workflow** button
 
-### How to Run Full Analysis on GitHub:
+### Running Full Paper Analysis
+1. Go to **Actions** tab
+2. Select **Climate Analysis** workflow  
+3. Click **Run workflow**
+4. Change settings:
+   - Analysis mode: **`paper`** (IMPORTANT!)
+5. Click **Run workflow** button
+6. Wait ~30-60 minutes for completion
 
-1. **Go to your GitHub repository**
-2. **Click on "Actions" tab**
-3. **Select "Climate Analysis" workflow**
-4. **Click "Run workflow"**
-5. **Choose analysis type:**
-   - `full` - Complete analysis for paper (all scenarios, 365 days)
-   - `quick` - Quick test (30 days)
-   - `baseline` - Normal climate only
-   - `heatwave` - Heatwave scenario only
-   - `extreme` - Extreme climate only
-6. **Click "Run workflow" button**
+### What Gets Generated
 
-### What Gets Generated for Your Paper:
+#### Quick Mode:
+- `{scenario}_epidemic.png` - Epidemic dynamics visualization
+- `{scenario}_data.npz` - Simulation data
+- `{scenario}_summary.txt` - Summary statistics
 
-The full analysis generates all figures needed for your research paper:
+#### Paper Mode (Full Analysis):
+- **Epidemic Dynamics**: 
+  - `baseline_epidemic_dynamics.png`
+  - `heatwave_epidemic_dynamics.png`
+  - `extreme_epidemic_dynamics.png`
+- **Stability Analysis**:
+  - `stability_analysis.png` - Eigenvalue analysis
+  - `bifurcation_diagram.png` - Temperature bifurcation
+- **Sensitivity Analysis**:
+  - `morris_sensitivity.png` - Morris screening results
+  - `sobol_sensitivity.png` - Sobol indices heatmap
+- **Comparison & Phase Portraits**:
+  - `scenario_comparison.png` - All scenarios comparison
+  - `phase_portrait_I_k.png` - Infected vs connectivity
+  - `phase_portrait_I_C.png` - Infected vs clustering
+- **Optimal Control**:
+  - `optimal_control_strategies.png` - Control inputs over time
+  - `controlled_vs_uncontrolled.png` - Impact comparison
+- **Data & Reports**:
+  - `{scenario}_results.npz` - Full simulation data
+  - `paper_analysis_summary.txt` - Complete summary
 
-- **Simulation Results** (for each scenario):
-  - `baseline_simulation.png` - Full 365-day simulation
-  - `heatwave_simulation.png` - Heatwave conditions
-  - `extreme_simulation.png` - Extreme climate conditions
-  - `*_epidemic.png` - Epidemic dynamics plots
+### Downloading Results
 
-- **Analysis Figures**:
-  - `bifurcation_diagram.png` - Temperature bifurcation analysis
-  - `stability_analysis.png` - System stability analysis
-  - `phase_portrait_baseline.png` - Phase space dynamics
-  - `morris_sensitivity.png` - Morris sensitivity analysis
-  - `sobol_sensitivity.png` - Sobol sensitivity heatmap
-  - `scenario_comparison.png` - Comparison across all scenarios
-  - `optimal_control.png` - Optimal control strategies
-
-- **Data Files**:
-  - `baseline_data.npz` - Baseline scenario data
-  - `heatwave_data.npz` - Heatwave scenario data
-  - `extreme_data.npz` - Extreme scenario data
-  - `analysis_summary.txt` - Summary statistics
-
-### Download Results:
-
-1. Wait for workflow to complete (takes ~30-60 minutes for full analysis)
-2. Click on the completed workflow run
-3. Scroll down to "Artifacts"
-4. Download `paper-analysis-results-{number}.zip`
-5. Extract to get all figures and data for your paper
-
-### Workflow Status
-[![Climate Analysis](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/climate_analysis.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/climate_analysis.yml)
+1. After workflow completes, click on the run
+2. Scroll to **Artifacts** section
+3. Download `analysis-results-{number}.zip`
+4. Extract to get all figures and data
 
 ## Project Structure
+
 ```
-├── models/              # Mathematical models
-├── analysis/            # Analysis modules  
-├── utils/               # Utility functions
-├── results/             # Output directory
-├── main.py              # Quick test entry point
-└── run_full_analysis.py # Full paper analysis
+urban_climate_resilience/
+├── models/                 # Mathematical models
+│   ├── coupled_system.py   # Main coupled dynamics
+│   ├── epidemiological_model.py  # SEIR with climate
+│   ├── network_model.py    # Dynamic networks
+│   └── optimal_control.py  # Control strategies
+├── analysis/              # Analysis modules
+│   ├── stability_analysis.py
+│   ├── sensitivity_analysis.py
+│   └── control_analysis.py
+├── utils/                 # Utilities
+│   ├── parameters.py      # Model parameters
+│   ├── visualization.py   # Plotting functions
+│   └── data_generator.py  # Climate scenarios
+├── main.py               # Quick analysis entry
+├── run_full_analysis.py  # Full paper analysis
+└── .github/workflows/    # GitHub Actions
+
 ```
+
+## Workflow Status
+
+[![Climate Analysis](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/climate_analysis.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/climate_analysis.yml)
+
+## Citation
+
+If you use this code in your research, please cite:
+```
+[Your Paper Title]
+[Authors]
+[Journal/Conference] [Year]
+```
+
+## License
+
+MIT License - see LICENSE file for details.
 

@@ -7,25 +7,28 @@ on:
     branches: [ main ]
   workflow_dispatch:
     inputs:
-      analysis_type:
-        description: 'Analysis type'
+      analysis_mode:
+        description: 'Analysis mode'
         required: true
+        default: 'quick'
+        type: choice
+        options:
+          - quick
+          - paper
+      analysis_type:
+        description: 'Scenario type (for quick mode)'
+        required: false
         default: 'baseline'
         type: choice
         options:
           - baseline
           - heatwave
           - extreme
-      quick_mode:
-        description: 'Run in quick mode'
-        required: true
-        default: 'true'
-        type: boolean
 
 jobs:
   analysis:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120  # 2 hours for full paper analysis
     
     steps:
     - name: Checkout code
@@ -37,10 +40,18 @@ jobs:
         python-version: '3.10'
         cache: 'pip'
     
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-dev
+        sudo apt-get install -y python3-dev libopenblas-dev gfortran
     
     - name: Install Python dependencies
       run: |
@@ -49,54 +60,58 @@ jobs:
         echo "Installed packages:"
         pip list
     
-    - name: Verify installation
+    - name: Verify imports
       run: |
         python -c "import numpy; print(f'NumPy: {numpy.__version__}')"
         python -c "import scipy; print(f'SciPy: {scipy.__version__}')"
         python -c "import matplotlib; print(f'Matplotlib: {matplotlib.__version__}')"
         python -c "import networkx; print(f'NetworkX: {networkx.__version__}')"
-    
-    - name: Check directory structure
-      run: |
-        echo "Current directory: $(pwd)"
-        echo "Directory contents:"
-        ls -la
-        echo "Models directory:"
-        ls -la models/ || echo "No models directory"
-        echo "Analysis directory:"
-        ls -la analysis/ || echo "No analysis directory"
-        echo "Utils directory:"
-        ls -la utils/ || echo "No utils directory"
+        python -c "import psutil; print(f'psutil: {psutil.__version__}')"
     
     - name: Run analysis
       env:
         PYTHONPATH: ${{ github.workspace }}
         MPLBACKEND: Agg
+        OMP_NUM_THREADS: 2
       run: |
-        # Use workflow inputs if available, otherwise defaults
-        ANALYSIS_TYPE="${{ github.event.inputs.analysis_type || 'baseline' }}"
-        QUICK_MODE="${{ github.event.inputs.quick_mode || 'true' }}"
+        # Use workflow inputs or defaults
+        MODE="${{ github.event.inputs.analysis_mode || 'quick' }}"
+        TYPE="${{ github.event.inputs.analysis_type || 'baseline' }}"
         
-        echo "Running analysis: type=$ANALYSIS_TYPE, quick=$QUICK_MODE"
+        echo "Analysis mode: $MODE"
         
-        if [ "$QUICK_MODE" = "true" ]; then
-          python main.py --analysis-type $ANALYSIS_TYPE --quick-mode --output-dir results
+        if [ "$MODE" = "paper" ]; then
+          echo "Running FULL PAPER ANALYSIS (this will take 30-60 minutes)..."
+          python run_full_analysis.py --output-dir paper_results
         else
-          python main.py --analysis-type $ANALYSIS_TYPE --output-dir results
+          echo "Running QUICK ANALYSIS (type: $TYPE)..."
+          python main.py --analysis-type $TYPE --quick-mode --output-dir results
         fi
     
-    - name: Check results
+    - name: List results
       if: always()
       run: |
-        echo "Results directory contents:"
-        if [ -d results ]; then
-          ls -la results/
-          echo "PNG files:"
-          find results -name "*.png" -type f | wc -l
-          echo "Data files:"
-          find results -name "*.npz" -type f | wc -l
+        echo "=== Results ==="
+        if [ "${{ github.event.inputs.analysis_mode }}" = "paper" ]; then
+          if [ -d paper_results ]; then
+            echo "Paper results directory:"
+            ls -la paper_results/
+            echo ""
+            echo "PNG files generated:"
+            find paper_results -name "*.png" -type f | sort
+            echo ""
+            echo "Data files generated:"
+            find paper_results -name "*.npz" -type f | sort
+          else
+            echo "No paper_results directory found"
+          fi
         else
-          echo "No results directory found"
+          if [ -d results ]; then
+            echo "Quick results directory:"
+            ls -la results/
+          else
+            echo "No results directory found"
+          fi
         fi
     
     - name: Upload results
@@ -104,14 +119,31 @@ jobs:
       if: always()
       with:
         name: analysis-results-${{ github.run_number }}
-        path: results/
+        path: |
+          results/
+          paper_results/
         retention-days: 30
     
-    - name: Upload logs
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: error-logs-${{ github.run_number }}
-        path: |
-          *.log
-          results/*.txt
+    - name: Create summary
+      if: always()
+      run: |
+        MODE="${{ github.event.inputs.analysis_mode || 'quick' }}"
+        
+        echo "## Analysis Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Mode**: $MODE" >> $GITHUB_STEP_SUMMARY
+        echo "- **Run**: #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Time**: $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "$MODE" = "paper" ] && [ -f paper_results/paper_analysis_summary.txt ]; then
+          echo "### Paper Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat paper_results/paper_analysis_summary.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        elif [ -f results/*_summary.txt ]; then
+          echo "### Quick Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat results/*_summary.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
