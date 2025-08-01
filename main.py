@@ -7,20 +7,37 @@ import argparse
 from pathlib import Path
 
 # Set matplotlib backend before importing
-import matplotlib
-matplotlib.use('Agg')
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+except ImportError as e:
+    print(f"Error importing matplotlib: {e}")
+    print("Please install required packages: pip install -r requirements.txt")
+    sys.exit(1)
 
-import numpy as np
-import matplotlib.pyplot as plt
+try:
+    import numpy as np
+    import matplotlib.pyplot as plt
+except ImportError as e:
+    print(f"Error importing required packages: {e}")
+    print("Please install: pip install numpy matplotlib")
+    sys.exit(1)
 
 # Import local modules
-from models.coupled_system import CoupledSystemModel
-from models.optimal_control import OptimalControlModel
-from analysis.stability_analysis import StabilityAnalysis
-from analysis.sensitivity_analysis import SensitivityAnalysis
-from utils.parameters import ModelParameters
-from utils.visualization import SystemVisualizer
-from utils.data_generator import DataGenerator
+try:
+    from models.coupled_system import CoupledSystemModel
+    from models.optimal_control import OptimalControlModel
+    from analysis.stability_analysis import StabilityAnalysis
+    from analysis.sensitivity_analysis import SensitivityAnalysis
+    from utils.parameters import ModelParameters
+    from utils.visualization import SystemVisualizer
+    from utils.data_generator import DataGenerator
+except ImportError as e:
+    print(f"Error importing local modules: {e}")
+    print(f"Current directory: {os.getcwd()}")
+    print(f"Python path: {sys.path}")
+    print("Make sure you're running from the project root directory")
+    sys.exit(1)
 
 
 def run_quick_analysis(output_dir='results'):
@@ -57,6 +74,10 @@ def run_quick_analysis(output_dir='results'):
     )
     
     print(f"Analysis complete! Results saved to {output_dir}/")
+    print(f"Generated files in {output_dir}:")
+    for file in Path(output_dir).glob("*"):
+        print(f"  - {file.name}")
+    
     return True
 
 
