@@ -5,6 +5,7 @@ import numpy as np
 import json
 import pickle
 from pathlib import Path
+import matplotlib.pyplot as plt
 from models.optimal_control import OptimalControlModel
 from models.coupled_system import CoupledSystemModel
 from utils.parameters import ModelParameters

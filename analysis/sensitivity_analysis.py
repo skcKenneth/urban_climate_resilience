@@ -434,8 +434,17 @@ class SensitivityAnalysis:
         
         # Simple epidemic scenario
         t = np.linspace(0, 30, 30)  # 30 days
-        T_func = lambda time: 25 + 5*np.sin(2*np.pi*time/365) if np.isscalar(time) else 25 + 5*np.sin(2*np.pi*np.asarray(time)/365)
-        H_func = lambda time: 0.7 if np.isscalar(time) else 0.7 * np.ones_like(time)
+        
+        def T_func(time):
+            time_array = np.atleast_1d(time)
+            result = 25 + 5*np.sin(2*np.pi*time_array/365)
+            return float(result) if np.isscalar(time) else result
+            
+        def H_func(time):
+            if np.isscalar(time):
+                return 0.7
+            else:
+                return 0.7 * np.ones_like(np.atleast_1d(time))
         
         try:
             time_points, states = model.solve_coupled_system(
@@ -445,5 +454,7 @@ class SensitivityAnalysis:
             
             # Return peak infection as output metric
             return np.max(states[1, :])
-        except:
+        except Exception as e:
+            # Log the error for debugging
+            print(f"Model evaluation error: {e}")
             return 0.0
