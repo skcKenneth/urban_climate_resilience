@@ -1,5 +1,10 @@
 # Urban Climate-Social Network Resilience System
 
+![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Analysis](https://img.shields.io/badge/Analysis-Automated-green.svg)
+![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)
+
 A comprehensive mathematical modeling framework for analyzing the coupled dynamics of climate change, epidemiological spread, and social network evolution in urban environments.
 
 ## Overview
@@ -93,11 +98,4 @@ The model reveals:
 ## License
 
 MIT License - See LICENSE file for details
-
-
-**![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Analysis](https://img.shields.io/badge/Analysis-Automated-green.svg)
-![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)
-**
 
