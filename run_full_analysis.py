@@ -37,7 +37,8 @@ def run_scenario_analysis(scenario_name, params, days, output_dir):
     
     # Generate climate data
     data_gen = DataGenerator(params)
-    t, T, H = data_gen.generate_climate_scenario(scenario_name, days=days)
+    T, H = data_gen.generate_climate_scenario(scenario_name, days=days)
+    t = np.linspace(0, days, days)
     
     # Create climate functions
     T_func = lambda time: np.interp(time, t, T)
@@ -167,8 +168,11 @@ def run_full_analysis_for_paper(output_dir='results'):
     
     # Equilibrium analysis
     final_state = baseline_results['states'][:, -1]
+    final_T = baseline_results['temperature'][-1]
+    final_H = baseline_results['humidity'][-1]
+    
     try:
-        eq_analysis = stability.analyze_equilibrium_stability(final_state)
+        eq_analysis = stability.stability_analysis(final_state, final_T, final_H)
         print(f"Eigenvalues: {eq_analysis['eigenvalues']}")
         print(f"System stable: {eq_analysis['stable']}")
         
@@ -282,32 +286,43 @@ def run_full_analysis_for_paper(output_dir='results'):
     try:
         control = ControlAnalysis(baseline_results['params'])
         
-        # Define control problem
-        initial_state = baseline_results['states'][:, 0]
-        t_control = np.linspace(0, 180, 181)  # 6 months control horizon
-        
-        # Solve optimal control
-        control_results = control.solve_optimal_control_problem(
-            initial_state,
-            t_control,
-            baseline_results['T_func'],
-            baseline_results['H_func'],
-            control_bounds={
-                'u_medical': (0, 0.5),
-                'u_social': (0, 0.3),
-                'u_environmental': (0, 0.2)
-            }
+        # Run control comparison which exists in the ControlAnalysis class
+        control_results = control.run_control_comparison(
+            t_span=(0, 180),  # 6 months
+            quick_mode=True
         )
         
-        # Plot control strategies
-        fig = viz.plot_control_strategies(control_results)
-        fig.savefig(Path(output_dir) / "optimal_control_strategies.png", dpi=300, bbox_inches='tight')
-        plt.close(fig)
-        
-        # Plot controlled vs uncontrolled
-        fig = viz.plot_controlled_vs_uncontrolled(control_results, baseline_results)
-        fig.savefig(Path(output_dir) / "controlled_vs_uncontrolled.png", dpi=300, bbox_inches='tight')
-        plt.close(fig)
+        if control_results:
+            # Plot whatever control results we got
+            if 'trajectories' in control_results:
+                # Create a simple plot of the control results
+                fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+                
+                # Plot epidemic curves
+                for strategy, data in control_results['trajectories'].items():
+                    if 'I' in data:
+                        ax1.plot(data['t'], data['I'], label=strategy)
+                
+                ax1.set_xlabel('Time (days)')
+                ax1.set_ylabel('Infected')
+                ax1.set_title('Control Strategy Comparison')
+                ax1.legend()
+                ax1.grid(True, alpha=0.3)
+                
+                # Plot network metrics if available
+                for strategy, data in control_results['trajectories'].items():
+                    if 'k_avg' in data:
+                        ax2.plot(data['t'], data['k_avg'], label=strategy)
+                
+                ax2.set_xlabel('Time (days)')
+                ax2.set_ylabel('Average Degree')
+                ax2.legend()
+                ax2.grid(True, alpha=0.3)
+                
+                plt.tight_layout()
+                fig.savefig(Path(output_dir) / "control_comparison.png", dpi=300, bbox_inches='tight')
+                plt.close(fig)
+                
     except Exception as e:
         print(f"Control analysis error: {e}")
     

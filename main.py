@@ -81,8 +81,9 @@ def run_analysis(analysis_type='baseline', quick_mode=False, output_dir='results
         print("Generating climate scenario...")
         data_gen = DataGenerator(params)
         
-        # Generate climate scenario
-        t, T, H = data_gen.generate_climate_scenario(analysis_type, days=days)
+        # Generate climate scenario (returns T, H)
+        T, H = data_gen.generate_climate_scenario(analysis_type, days=days)
+        t = np.linspace(0, days, days)  # Create time array
         
         # Create climate functions for the model
         T_func = lambda time: np.interp(time, t, T)
@@ -159,9 +160,13 @@ def run_analysis(analysis_type='baseline', quick_mode=False, output_dir='results
             # Get final state for equilibrium analysis
             final_state = states[:, -1]
             
+            # Get final temperature and humidity for stability analysis
+            final_T = T[-1]
+            final_H = H[-1]
+            
             # Analyze stability at equilibrium
             try:
-                stability_results = stability.analyze_equilibrium_stability(final_state)
+                stability_results = stability.stability_analysis(final_state, final_T, final_H)
                 
                 # Generate stability visualization if we have results
                 if stability_results and 'eigenvalues' in stability_results:
