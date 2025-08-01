@@ -11,16 +11,16 @@ Cache Enabled: False
 
 Starting automated analysis...
 Check debug_log.txt for progress updates.
-2025-08-01 11:32:08,948 - INFO - Python: 3.11.13 (main, Jun  4 2025, 04:12:12) [GCC 13.3.0]
-2025-08-01 11:32:08,948 - INFO - Platform: linux
-2025-08-01 11:32:08,948 - INFO - Memory: 16.8GB total, 15.9GB available
-2025-08-01 11:32:08,948 - INFO - Attempt 1/3
-2025-08-01 11:32:08,948 - INFO - Starting full analysis...
-2025-08-01 11:32:10,240 - INFO - generated new fontManager
-2025-08-01 11:32:11,716 - WARNING - Full analysis failed: cannot import name 'ClimateDataGenerator' from 'utils.data_generator' (/home/runner/work/urban_climate_resilience/urban_climate_resilience/utils/data_generator.py)
-2025-08-01 11:32:11,716 - INFO - Starting reduced analysis...
-2025-08-01 11:32:13,587 - INFO - Success! Execution time: 4.64 seconds
-2025-08-01 11:32:13,588 - INFO - Final memory usage: 237.5 MB
+2025-08-01 11:35:02,857 - INFO - Python: 3.11.13 (main, Jun  4 2025, 04:12:12) [GCC 13.3.0]
+2025-08-01 11:35:02,857 - INFO - Platform: linux
+2025-08-01 11:35:02,857 - INFO - Memory: 16.8GB total, 15.8GB available
+2025-08-01 11:35:02,857 - INFO - Attempt 1/3
+2025-08-01 11:35:02,857 - INFO - Starting full analysis...
+2025-08-01 11:35:03,887 - INFO - generated new fontManager
+2025-08-01 11:35:05,225 - WARNING - Full analysis failed: cannot import name 'ClimateDataGenerator' from 'utils.data_generator' (/home/runner/work/urban_climate_resilience/urban_climate_resilience/utils/data_generator.py)
+2025-08-01 11:35:05,225 - INFO - Starting reduced analysis...
+2025-08-01 11:35:07,069 - INFO - Success! Execution time: 4.21 seconds
+2025-08-01 11:35:07,069 - INFO - Final memory usage: 237.2 MB
 
 🎉 SUCCESS! Analysis completed.
 📊 Check the generated PNG files for results.
