@@ -8,18 +8,27 @@ import time
 import subprocess
 from datetime import datetime
 import json
+import os
+import psutil
 
 class AutoDebugger:
     def __init__(self, log_file="debug_log.txt"):
         self.log_file = log_file
         self.setup_logging()
+        # Enhanced error recovery system
         self.error_fixes = {
             "ImportError": self.fix_import_error,
             "ModuleNotFoundError": self.fix_module_error,
             "MemoryError": self.fix_memory_error,
             "TimeoutError": self.reduce_complexity,
-            "ValueError": self.fix_value_error
+            "ValueError": self.fix_value_error,
+            "RuntimeError": self.fix_runtime_error,
+            "OSError": self.fix_os_error
         }
+        
+        # Performance monitoring
+        self.process = psutil.Process()
+        self.max_memory_gb = 2.0  # GitHub Actions has ~7GB, keep under 2GB to be safe
     
     def setup_logging(self):
         """Setup comprehensive logging"""
@@ -32,6 +41,26 @@ class AutoDebugger:
             ]
         )
         self.logger = logging.getLogger(__name__)
+        
+        # Log system info
+        self.logger.info(f"Python: {sys.version}")
+        self.logger.info(f"Platform: {sys.platform}")
+        if hasattr(psutil, 'virtual_memory'):
+            mem = psutil.virtual_memory()
+            self.logger.info(f"Memory: {mem.total / 1e9:.1f}GB total, {mem.available / 1e9:.1f}GB available")
+    
+    def monitor_resources(self):
+        """Monitor memory usage and warn if excessive"""
+        try:
+            memory_mb = self.process.memory_info().rss / 1024 / 1024
+            memory_gb = memory_mb / 1024
+            
+            if memory_gb > self.max_memory_gb:
+                self.logger.warning(f"High memory usage: {memory_gb:.2f}GB (limit: {self.max_memory_gb}GB)")
+                return False
+            return True
+        except Exception:
+            return True  # If monitoring fails, continue
     
     def fix_import_error(self, error_msg):
         """Auto-fix common import errors"""
@@ -95,18 +124,71 @@ except ImportError:
             return True
         return False
     
+    def fix_runtime_error(self, error_msg):
+        """Fix common runtime errors"""
+        if "font" in error_msg.lower() or "matplotlib" in error_msg.lower():
+            self.logger.info("Fixing matplotlib font/display issues...")
+            # Set non-interactive backend
+            os.environ['MPLBACKEND'] = 'Agg'
+            os.environ['MPLCONFIGDIR'] = '/tmp'
+            return True
+        return False
+    
+    def fix_os_error(self, error_msg):
+        """Fix OS-related errors"""
+        if "no space left" in error_msg.lower():
+            self.logger.info("Disk space issue detected - enabling cleanup...")
+            return self.cleanup_temporary_files()
+        return False
+    
+    def cleanup_temporary_files(self):
+        """Clean up temporary files to save space"""
+        try:
+            import tempfile
+            import shutil
+            temp_dir = tempfile.gettempdir()
+            # Clean matplotlib cache
+            for item in os.listdir(temp_dir):
+                if 'matplotlib' in item or 'fontList' in item:
+                    item_path = os.path.join(temp_dir, item)
+                    try:
+                        if os.path.isfile(item_path):
+                            os.remove(item_path)
+                        elif os.path.isdir(item_path):
+                            shutil.rmtree(item_path)
+                    except Exception:
+                        continue
+            return True
+        except Exception:
+            return False
+    
     def run_with_auto_debug(self, main_function, max_attempts=3):
         """Run main function with automatic debugging"""
         for attempt in range(max_attempts):
             self.logger.info(f"Attempt {attempt + 1}/{max_attempts}")
             
+            # Check memory before starting
+            if not self.monitor_resources():
+                self.logger.warning("High memory usage detected - attempting cleanup")
+                self.cleanup_temporary_files()
+            
             try:
                 # Monitor execution time
                 start_time = time.time()
+                
+                # Set environment variables for memory-conscious execution
+                if os.getenv('GITHUB_ACTIONS'):
+                    os.environ['OMP_NUM_THREADS'] = '2'  # Limit OpenMP threads
+                    os.environ['MKL_NUM_THREADS'] = '2'  # Limit MKL threads
+                
                 result = main_function()
                 end_time = time.time()
                 
                 self.logger.info(f"Success! Execution time: {end_time - start_time:.2f} seconds")
+                
+                # Final memory check
+                memory_mb = self.process.memory_info().rss / 1024 / 1024
+                self.logger.info(f"Final memory usage: {memory_mb:.1f} MB")
                 return result
                 
             except Exception as e:

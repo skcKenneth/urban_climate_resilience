@@ -1,6 +1,14 @@
 """
 Main execution script for Urban Climate-Social Network Resilience System
 """
+import os
+import signal
+import time
+from contextlib import contextmanager
+import matplotlib
+# Set non-interactive backend for headless environments
+matplotlib.use('Agg')
+
 import numpy as np
 import matplotlib.pyplot as plt
 from models.coupled_system import CoupledSystemModel
@@ -10,6 +18,27 @@ from analysis.sensitivity_analysis import SensitivityAnalysis
 from utils.parameters import ModelParameters
 from utils.visualization import SystemVisualizer
 from utils.data_generator import DataGenerator
+
+@contextmanager
+def timeout_context(seconds):
+    """Context manager for timeout handling"""
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"Operation timed out after {seconds} seconds")
+    
+    # Set up signal handler (Unix only)
+    try:
+        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(seconds)
+        yield
+    except AttributeError:
+        # Windows doesn't have SIGALRM, just yield without timeout
+        yield
+    finally:
+        try:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+        except AttributeError:
+            pass
 
 def main():
     """Main analysis pipeline"""
@@ -116,8 +145,13 @@ def main():
         y0 = [params.N * 0.99, 0, params.N * 0.01, 0, params.k_0, 0.3]
         
         try:
-            strategy_comparison = control_model.compare_strategies(
-                [0, 365], y0, T_func, H_func, budget_func
+            # Apply timeout for GitHub Actions environment
+            timeout_seconds = int(os.getenv('MAX_TIME', '600'))  # Default 10 minutes
+            print(f"   Control analysis timeout: {timeout_seconds/60:.1f} minutes")
+            
+            with timeout_context(timeout_seconds):
+                strategy_comparison = control_model.compare_strategies(
+                    [0, 365], y0, T_func, H_func, budget_func
             )
             
             # Print strategy comparison
@@ -141,8 +175,11 @@ def main():
     
     try:
         # Sobol sensitivity analysis (reduced samples for demo)
-        print("   Running Sobol sensitivity analysis...")
-        sobol_results = sensitivity_analyzer.sobol_sensitivity_analysis(n_samples=100)
+        n_samples = int(os.getenv('N_SAMPLES', '100'))
+        print(f"   Running Sobol sensitivity analysis (n={n_samples})...")
+        
+        with timeout_context(300):  # 5 minute timeout for sensitivity analysis
+            sobol_results = sensitivity_analyzer.sobol_sensitivity_analysis(n_samples=n_samples)
         
         if sobol_results:
             fig = visualizer.plot_sensitivity_analysis(sobol_results)
@@ -164,8 +201,11 @@ def main():
     # Uncertainty quantification
     print("\n7. Uncertainty quantification...")
     try:
-        print("   Running Monte Carlo uncertainty analysis...")
-        mc_results = sensitivity_analyzer.monte_carlo_uncertainty(n_samples=100)
+        n_samples_mc = int(os.getenv('N_SAMPLES', '100'))
+        print(f"   Running Monte Carlo uncertainty analysis (n={n_samples_mc})...")
+        
+        with timeout_context(300):  # 5 minute timeout for Monte Carlo
+            mc_results = sensitivity_analyzer.monte_carlo_uncertainty(n_samples=n_samples_mc)
         
         if mc_results:
             bounds = sensitivity_analyzer.calculate_uncertainty_bounds(mc_results)

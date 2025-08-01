@@ -1,6 +1,17 @@
 """
 Visualization utilities for the climate-social network resilience system
 """
+import os
+import matplotlib
+# Set non-interactive backend for headless environments (GitHub Actions)
+matplotlib.use('Agg')
+# Disable font caching and use system fonts to avoid emoji font issues
+matplotlib.rcParams['font.family'] = 'DejaVu Sans'
+matplotlib.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Liberation Sans', 'Arial', 'sans-serif']
+matplotlib.rcParams['axes.unicode_minus'] = False
+# Disable automatic font rebuilding
+os.environ['MPLCONFIGDIR'] = '/tmp'
+
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -8,8 +19,11 @@ import networkx as nx
 from matplotlib.patches import Rectangle
 import pandas as pd
 
+# Configure plotting style
 plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")
+# Ensure tight layout by default
+plt.rcParams['figure.autolayout'] = True
 
 class SystemVisualizer:
     """Visualization tools for system analysis"""
