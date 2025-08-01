@@ -73,25 +73,24 @@ def run_analysis(analysis_type='full', quick_mode=False, parallel=False, output_
         population = 10000
     
     # Configure scenarios
+    baseline_params = ModelParameters()
+    baseline_params.N = population
+    
+    heatwave_params = ModelParameters()
+    heatwave_params.N = population
+    heatwave_params.T_0 = 30.0  # Higher reference temperature
+    heatwave_params.H_0 = 0.8   # Higher humidity
+    
+    extreme_params = ModelParameters()
+    extreme_params.N = population
+    extreme_params.T_0 = 35.0   # Extreme temperature
+    extreme_params.H_0 = 0.9    # Extreme humidity
+    extreme_params.T_critical = 40.0  # Higher critical threshold
+    
     scenarios = {
-        'baseline': ModelParameters(
-            temperature_baseline=20.0,
-            humidity_baseline=0.6,
-            climate_amplitude=5.0,
-            population_size=population
-        ),
-        'heatwave': ModelParameters(
-            temperature_baseline=30.0,
-            humidity_baseline=0.8,
-            climate_amplitude=8.0,
-            population_size=population
-        ),
-        'extreme': ModelParameters(
-            temperature_baseline=35.0,
-            humidity_baseline=0.9,
-            climate_amplitude=10.0,
-            population_size=population
-        )
+        'baseline': baseline_params,
+        'heatwave': heatwave_params,
+        'extreme': extreme_params
     }
     
     # Determine which scenarios to run
@@ -131,7 +130,7 @@ def run_analysis(analysis_type='full', quick_mode=False, parallel=False, output_
                 H_func = lambda time: np.interp(time, t, humidity_data)
                 
                 # Initial conditions: [S, E, I, R, k_avg, C]
-                y0 = [params.population_size * 0.99, 0, params.population_size * 0.01, 0, params.k_0, 0.3]
+                y0 = [params.N * 0.99, 0, params.N * 0.01, 0, params.k_0, 0.3]
                 
                 # Solve the coupled system
                 time_points, state = model.solve_coupled_system(

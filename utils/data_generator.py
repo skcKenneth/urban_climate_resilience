@@ -41,6 +41,47 @@ class DataGenerator:
         
         return scenarios
     
+    def generate_climate_scenario(self, scenario_type='baseline', days=365):
+        """Generate a single climate scenario"""
+        t = np.linspace(0, days, days)
+        
+        if scenario_type == 'baseline':
+            T = 20 + 10*np.sin(2*np.pi*t/365)
+            H = 0.6 + 0.2*np.sin(2*np.pi*t/365 + np.pi/4)
+        elif scenario_type == 'heatwave':
+            T = 25 + 10*np.sin(2*np.pi*t/365)
+            # Add heatwave event
+            heatwave_start = days // 2
+            mask = (t >= heatwave_start) & (t <= heatwave_start + 10)
+            T[mask] += 8*np.exp(-(t[mask] - heatwave_start - 5)**2/10)
+            H = 0.7 + 0.2*np.sin(2*np.pi*t/365 + np.pi/4)
+        elif scenario_type == 'extreme':
+            T = 28 + 12*np.sin(2*np.pi*t/365) + 2*self.rng.normal(0, 1, len(t))
+            # Add multiple heatwave events
+            heatwave_times = [days//4, days//2, 3*days//4]
+            for hw_time in heatwave_times:
+                mask = (t >= hw_time) & (t <= hw_time + 10)
+                T[mask] += 10*np.exp(-(t[mask] - hw_time - 5)**2/15)
+            H = 0.8 + 0.15*np.sin(2*np.pi*t/365 + np.pi/3)
+        else:
+            # Default to baseline
+            T = 20 + 10*np.sin(2*np.pi*t/365)
+            H = 0.6 + 0.2*np.sin(2*np.pi*t/365 + np.pi/4)
+            
+        return T, H
+    
+    def temperature_function(self):
+        """Return a temperature function for use in models"""
+        def T_func(t):
+            return 20 + 10*np.sin(2*np.pi*t/365) + 2*np.random.normal(0, 1)
+        return T_func
+    
+    def humidity_function(self):
+        """Return a humidity function for use in models"""
+        def H_func(t):
+            return 0.6 + 0.2*np.sin(2*np.pi*t/365 + np.pi/4)
+        return H_func
+    
     def generate_initial_conditions(self, n_scenarios=5):
         """Generate different initial condition scenarios"""
         scenarios = {}
