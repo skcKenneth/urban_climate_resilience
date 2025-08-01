@@ -13,6 +13,11 @@ on:
       - '**.py'
       - 'requirements.txt'
 
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
 jobs:
   climate-analysis:
     runs-on: ubuntu-latest
