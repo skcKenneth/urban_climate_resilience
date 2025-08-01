@@ -8,7 +8,7 @@ from pathlib import Path
 from models.optimal_control import OptimalControlModel
 from models.coupled_system import CoupledSystemModel
 from utils.parameters import ModelParameters
-from utils.data_generator import ClimateDataGenerator, generate_network_snapshot
+from utils.data_generator import DataGenerator
 from utils.visualization import SystemVisualizer
 import logging
 
@@ -30,7 +30,7 @@ class ControlAnalysis:
         logger.info("Starting control strategy comparison analysis")
         
         # Generate initial conditions and functions
-        climate_gen = ClimateDataGenerator()
+        climate_gen = DataGenerator()
         T_func = climate_gen.temperature_function()
         H_func = climate_gen.humidity_function()
         
