@@ -5,9 +5,12 @@ import os
 import matplotlib
 # Set non-interactive backend for headless environments (GitHub Actions)
 matplotlib.use('Agg')
-# Disable font caching and use system fonts to avoid emoji font issues
-matplotlib.rcParams['font.family'] = 'DejaVu Sans'
+# Configure fonts for better mathematical symbol support
+matplotlib.rcParams['font.family'] = 'serif'
+matplotlib.rcParams['font.serif'] = ['DejaVu Serif', 'Liberation Serif', 'Times New Roman', 'serif']
 matplotlib.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Liberation Sans', 'Arial', 'sans-serif']
+matplotlib.rcParams['font.monospace'] = ['DejaVu Sans Mono', 'Liberation Mono', 'Courier New', 'monospace']
+matplotlib.rcParams['mathtext.fontset'] = 'dejavuserif'
 matplotlib.rcParams['axes.unicode_minus'] = False
 # Disable automatic font rebuilding
 os.environ['MPLCONFIGDIR'] = '/tmp'
@@ -58,7 +61,7 @@ class SystemVisualizer:
         T_values = [T_func(time) for time in t]
         ax2_temp = ax2.twinx()
         ax2_temp.plot(t, T_values, 'r--', alpha=0.7, label='Temperature')
-        ax2_temp.set_ylabel('Temperature (°C)', color='red')
+        ax2_temp.set_ylabel('Temperature ($^\\circ$C)', color='red')
         ax2_temp.tick_params(axis='y', labelcolor='red')
         
         # Network metrics
@@ -127,8 +130,8 @@ class SystemVisualizer:
         
         # R0
         ax3.plot(temperatures, R0_values, 'k-', linewidth=2)
-        ax3.axhline(y=1, color='red', linestyle='--', alpha=0.7, label='R₀ = 1')
-        ax3.set_xlabel('Temperature (°C)')
+        ax3.axhline(y=1, color='red', linestyle='--', alpha=0.7, label='$R_0 = 1$')
+        ax3.set_xlabel('Temperature ($^\\circ$C)')
         ax3.set_ylabel('Basic Reproduction Number')
         ax3.legend()
         ax3.grid(True, alpha=0.3)

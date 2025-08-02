@@ -214,9 +214,8 @@ def run_full_analysis_for_paper(output_dir='results'):
                 'sigma': (0.1, 0.3),
                 'gamma': (0.1, 0.3),
                 'kappa': (0.1, 0.5),
-                'epsilon': (0.5, 2.0),
-                'sigma_k': (5, 20),
-                'T_critical': (35, 45)
+                'sigma_k': (1, 10),
+                'T_critical': (30, 40)
             }
         )
         

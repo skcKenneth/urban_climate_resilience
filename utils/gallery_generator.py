@@ -412,10 +412,10 @@ class GalleryGenerator:
                 resilience: '0.72'
             }},
             sensitivity: {{
-                infections: 'β₀: 0.35',
-                peak: 'γ: 0.28',
-                network: 'k₀: 0.22',
-                resilience: 'α: 0.18'
+                infections: '$\\beta_0$: 0.35',
+                peak: '$\\gamma$: 0.28',
+                network: '$k_0$: 0.22',
+                resilience: '$\\alpha$: 0.18'
             }},
             uncertainty: {{
                 infections: '12,450 ± 1,200',

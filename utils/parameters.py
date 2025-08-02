@@ -20,7 +20,7 @@ class ModelParameters:
         # Climate forcing parameters
         self.alpha_T = 0.02  # Temperature effect coefficient
         self.alpha_H = 0.01  # Humidity effect coefficient
-        self.T_0 = 25.0  # Reference temperature (°C)
+        self.T_0 = 25.0  # Reference temperature (deg C)
         self.H_0 = 0.6  # Reference humidity
         self.T_critical = 35.0  # Critical temperature threshold
         self.T_opt = 22.0  # Optimal temperature for social interaction

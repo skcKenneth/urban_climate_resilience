@@ -1,0 +1,56 @@
+{
+  "no_control": {
+    "total_infections": 60945.40750964213,
+    "peak_infections": 1304.457198412328,
+    "final_network_degree": 6.210999100124505,
+    "avg_clustering": 0.1603015780790995,
+    "avg_resilience": 0.2879152326637977,
+    "min_resilience": 0.11270769306591823,
+    "performance_score": 0.31929359919700806,
+    "rank": 4
+  },
+  "medical_only": {
+    "total_infections": 38696.80144086073,
+    "peak_infections": 715.2844393461909,
+    "final_network_degree": 6.201883532456321,
+    "avg_clustering": 0.16872986299208506,
+    "avg_resilience": 0.29960617660369726,
+    "min_resilience": 0.11462853975538677,
+    "performance_score": 0.32246282195275394,
+    "rank": 3
+  },
+  "social_only": {
+    "total_infections": 78136.76729491192,
+    "peak_infections": 1808.8287215694954,
+    "final_network_degree": 7.783689336418119,
+    "avg_clustering": 0.154783685909553,
+    "avg_resilience": 0.315868530329921,
+    "min_resilience": 0.18450950566738822,
+    "performance_score": 0.386654028378075,
+    "rank": 1
+  },
+  "climate_only": {
+    "total_infections": 70441.33074196283,
+    "peak_infections": 1386.9304214014855,
+    "final_network_degree": 5.652066595951169,
+    "avg_clustering": 0.15936154734939248,
+    "avg_resilience": 0.3145004979468001,
+    "min_resilience": 0.1605510333965874,
+    "performance_score": 0.3063083251360292,
+    "rank": 5
+  },
+  "optimal": {
+    "total_infections": 65198.16913271908,
+    "peak_infections": 1172.3852087194296,
+    "final_network_degree": 7.059128606129298,
+    "avg_clustering": 0.16149701115876064,
+    "avg_resilience": 0.3305883411806485,
+    "min_resilience": 0.18156615091680647,
+    "performance_score": 0.3638999601315495,
+    "avg_medical_control": 0.7164149476805942,
+    "avg_social_control": 0.5309413440131622,
+    "avg_climate_control": 0.5758813338304882,
+    "total_control_effort": 91.16188127621223,
+    "rank": 2
+  }
+}

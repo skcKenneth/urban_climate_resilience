@@ -12,14 +12,16 @@ except ImportError:
 import matplotlib.pyplot as plt
 from models.coupled_system import CoupledSystemModel
 from utils.parameters import ModelParameters
+from utils.sensitivity_config import SensitivityConfig
 
 class SensitivityAnalysis:
     """Model validation and sensitivity analysis tools"""
     
     def __init__(self, params=None):
         self.params = params if params else ModelParameters()
+        self.config = SensitivityConfig.from_environment()
         self.start_time = time.time()
-        self.max_time = int(os.getenv('MAX_TIME', 1200))  # Default 20 minutes
+        self.max_time = self.config.MAX_TIME
         self.quick_mode = os.getenv('QUICK_MODE', 'false').lower() == 'true'
         
     def check_timeout(self):
@@ -30,44 +32,125 @@ class SensitivityAnalysis:
             return True
         return False
         
+    def round_to_power_of_2(self, n):
+        """Round n to the nearest power of 2 for optimal Sobol sequence performance"""
+        if n <= 0:
+            return 1
+        # Find the nearest power of 2
+        power = int(np.log2(n))
+        lower = 2**power
+        upper = 2**(power + 1)
+        
+        # Return the closer power of 2
+        if n - lower < upper - n:
+            return lower
+        else:
+            return upper
+        
     @lru_cache(maxsize=128)
     def generate_sobol_samples(self, n_params, n_samples):
         """Generate Sobol sequence samples with version compatibility and caching"""
+        # Ensure n_samples is a power of 2 for optimal Sobol performance
+        optimal_n = self.round_to_power_of_2(n_samples)
+        if optimal_n != n_samples:
+            print(f"Adjusting sample size from {n_samples} to {optimal_n} (nearest power of 2) for optimal Sobol sequence performance")
+        
         try:
             # For scipy >= 1.7
             sampler = Sobol(d=n_params, scramble=True)
-            samples = sampler.random(n=n_samples)
+            samples = sampler.random(n=optimal_n)
             return samples
         except (NameError, ImportError):
             # For older scipy versions
             try:
-                samples = sobol_seq.i4_sobol_generate(n_params, n_samples)
+                samples = sobol_seq.i4_sobol_generate(n_params, optimal_n)
                 return samples
             except:
                 # Fallback to quasi-random
                 print("Warning: Using fallback pseudo-random instead of Sobol sequence")
-                return np.random.random((n_samples, n_params))
-        
+                return np.random.random((optimal_n, n_params))
+    
+    def _extract_simulation_metrics(self, t_sim, y_sim, params):
+        """Extract metrics from simulation results with proper array handling"""
+        try:
+            # y_sim is a 2D array with shape (n_variables, n_time_points)
+            # Variables are [S, E, I, R, k_avg, C]
+            if y_sim is None or len(y_sim.shape) < 2:
+                print("Warning: Invalid simulation results")
+                return None
+            
+            # Extract individual variables
+            S = y_sim[0, :]  # Susceptible
+            E = y_sim[1, :]  # Exposed
+            I = y_sim[2, :]  # Infected
+            R = y_sim[3, :]  # Recovered
+            k_avg = y_sim[4, :]  # Average network degree
+            C = y_sim[5, :]  # Clustering coefficient
+            
+            # Calculate metrics
+            metrics = {
+                'peak_infections': float(np.max(I)),
+                'total_infections': float(np.trapz(I, t_sim)),
+                'final_size': float(R[-1] / params.N),
+                'min_network_degree': float(np.min(k_avg)),
+                'max_network_degree': float(np.max(k_avg)),
+                'avg_clustering': float(np.mean(C))
+            }
+            
+            # Validate metrics
+            for key, value in metrics.items():
+                if np.isnan(value) or np.isinf(value):
+                    print(f"Warning: Invalid {key} value: {value}")
+                    return None
+            
+            return metrics
+            
+        except Exception as e:
+            print(f"Error extracting simulation metrics: {e}")
+            return None
+    
+    def _run_simulation(self, params, T_scenario='baseline'):
+        """Run a single simulation with proper error handling"""
+        try:
+            # Create coupled model
+            coupled_model = CoupledSystemModel(params)
+            
+            # Get climate scenario
+            t, T, H = params.get_climate_scenario(T_scenario)
+            T_func = lambda time: np.interp(time, t, T)
+            H_func = lambda time: np.interp(time, t, H)
+            
+            # Initial conditions
+            y0 = [params.N * 0.99, 0, params.N * 0.01, 0, params.k_0, 0.3]
+            
+            # Use shorter simulation time in quick mode
+            sim_days = int(os.getenv('SIMULATION_DAYS', 365))
+            if self.quick_mode:
+                sim_days = min(sim_days, 180)
+            
+            # Run simulation
+            t_sim, y_sim = coupled_model.solve_coupled_system(
+                [0, sim_days], y0, T_func, H_func
+            )
+            
+            # Extract metrics
+            return self._extract_simulation_metrics(t_sim, y_sim, params)
+            
+        except Exception as e:
+            print(f"Simulation failed: {e}")
+            return None
+    
     def sobol_sensitivity_analysis(self, n_samples=None, T_scenario='baseline'):
         """Perform Sobol sensitivity analysis with optimized settings"""
         
-        # Use environment variable or default
-        if n_samples is None:
-            n_samples = int(os.getenv('N_SAMPLES', 1000))
-            if self.quick_mode:
-                n_samples = min(n_samples, 200)  # Limit samples in quick mode
+        # Use configuration for optimal sample size
+        n_samples = self.config.get_optimal_sample_size(n_samples, self.quick_mode)
         
-        # Define parameter ranges (as multipliers of base values)
-        param_ranges = {
-            'beta_0': (0.5, 2.0),
-            'sigma': (0.5, 2.0),
-            'gamma': (0.5, 2.0),
-            'alpha_T': (0.5, 2.0),
-            'kappa': (0.0, 1.0),
-            'k_0': (0.5, 2.0),
-            'alpha_net': (0.5, 2.0),
-            'beta_ep': (0.0, 0.2)
-        }
+        # Use parameter ranges from configuration
+        param_ranges = self.config.PARAMETER_RANGES.copy()
+        
+        # Validate parameter ranges
+        param_ranges = self.validate_parameter_ranges(param_ranges)
         
         n_params = len(param_ranges)
         
@@ -97,45 +180,8 @@ class SensitivityAnalysis:
                 base_value = getattr(base_params, param_name)
                 setattr(modified_params, param_name, base_value * params_vector[i])
             
-            # Run simulation with reduced time in quick mode
-            coupled_model = CoupledSystemModel(modified_params)
-            
-            # Get climate scenario
-            t, T, H = modified_params.get_climate_scenario(T_scenario)
-            T_func = lambda time: np.interp(time, t, T)
-            H_func = lambda time: np.interp(time, t, H)
-            
-            # Initial conditions
-            y0 = [modified_params.N * 0.99, 0, modified_params.N * 0.01, 0, 
-                  modified_params.k_0, 0.3]
-            
-            try:
-                # Use shorter simulation time in quick mode
-                sim_days = int(os.getenv('SIMULATION_DAYS', 365))
-                if self.quick_mode:
-                    sim_days = min(sim_days, 180)
-                
-                t_sim, y_sim = coupled_model.solve_coupled_system(
-                    [0, sim_days], y0, T_func, H_func
-                )
-                
-                # Calculate metrics
-                S, E, I, R, k_avg, C = y_sim
-                
-                metrics = {
-                    'peak_infections': np.max(I),
-                    'total_infections': np.trapz(I, t_sim),
-                    'final_size': R[-1] / modified_params.N,
-                    'min_network_degree': np.min(k_avg),
-                    'max_network_degree': np.max(k_avg),
-                    'avg_clustering': np.mean(C)
-                }
-                
-                return metrics
-                
-            except Exception as e:
-                print(f"Simulation failed: {e}")
-                return None
+            # Run simulation
+            return self._run_simulation(modified_params, T_scenario)
         
         # Run sensitivity analysis with progress tracking
         print(f"Running Sobol sensitivity analysis with {n_samples} samples...")
@@ -149,28 +195,33 @@ class SensitivityAnalysis:
             
             # Evaluate model A
             result_A = evaluate_model(param_samples_A[i])
-            if result_A is None:
-                print("⚠️  Stopping analysis due to timeout")
-                break
-            results_A.append(result_A)
+            if result_A is not None:
+                results_A.append(result_A)
             
             # Evaluate model B
             result_B = evaluate_model(param_samples_B[i])
-            if result_B is None:
-                print("⚠️  Stopping analysis due to timeout")
+            if result_B is not None:
+                results_B.append(result_B)
+            
+            # Check for timeout
+            if self.check_timeout():
+                print("Analysis timed out")
                 break
-            results_B.append(result_B)
         
+        # Check if we have enough results
         if len(results_A) < n_samples // 2:
-            print("⚠️  Insufficient samples for reliable sensitivity analysis")
+            print(f"Warning: Only {len(results_A)} successful simulations out of {n_samples}")
             return None
         
         # Calculate sensitivity indices
-        sensitivity_results = self.calculate_sensitivity_indices(
-            results_A, results_B, param_names
-        )
+        sensitivity_indices = self.calculate_sensitivity_indices(results_A, results_B, param_names)
         
-        return sensitivity_results
+        return {
+            'sensitivity_indices': sensitivity_indices,
+            'param_names': param_names,
+            'n_samples': n_samples,
+            'successful_simulations': len(results_A)
+        }
     
     def calculate_sensitivity_indices(self, results_A, results_B, param_names):
         """Calculate Sobol sensitivity indices efficiently"""
@@ -220,25 +271,13 @@ class SensitivityAnalysis:
     def monte_carlo_uncertainty(self, n_samples=None, T_scenario='heatwave'):
         """Perform Monte Carlo uncertainty analysis with optimized settings"""
         
-        # Use environment variable or default
-        if n_samples is None:
-            n_samples = int(os.getenv('N_SAMPLES', 500))
-            if self.quick_mode:
-                n_samples = min(n_samples, 100)  # Limit samples in quick mode
+        # Use configuration for optimal sample size
+        n_samples = self.config.get_mc_sample_size(n_samples, self.quick_mode)
         
         print(f"Running Monte Carlo uncertainty analysis with {n_samples} samples...")
         
-        # Define parameter uncertainties (as standard deviations)
-        param_uncertainties = {
-            'beta_0': 0.2,
-            'sigma': 0.1,
-            'gamma': 0.1,
-            'alpha_T': 0.3,
-            'kappa': 0.1,
-            'k_0': 0.5,
-            'alpha_net': 0.2,
-            'beta_ep': 0.05
-        }
+        # Use parameter uncertainties from configuration
+        param_uncertainties = self.config.PARAMETER_UNCERTAINTIES.copy()
         
         # Generate parameter samples
         param_names = list(param_uncertainties.keys())
@@ -275,44 +314,9 @@ class SensitivityAnalysis:
                 setattr(modified_params, param_name, param_samples[i, j])
             
             # Run simulation
-            coupled_model = CoupledSystemModel(modified_params)
-            
-            # Get climate scenario
-            t, T, H = modified_params.get_climate_scenario(T_scenario)
-            T_func = lambda time: np.interp(time, t, T)
-            H_func = lambda time: np.interp(time, t, H)
-            
-            # Initial conditions
-            y0 = [modified_params.N * 0.99, 0, modified_params.N * 0.01, 0, 
-                  modified_params.k_0, 0.3]
-            
-            try:
-                # Use shorter simulation time in quick mode
-                sim_days = int(os.getenv('SIMULATION_DAYS', 365))
-                if self.quick_mode:
-                    sim_days = min(sim_days, 180)
-                
-                t_sim, y_sim = coupled_model.solve_coupled_system(
-                    [0, sim_days], y0, T_func, H_func
-                )
-                
-                # Calculate metrics
-                S, E, I, R, k_avg, C = y_sim
-                
-                metrics = {
-                    'peak_infections': np.max(I),
-                    'total_infections': np.trapz(I, t_sim),
-                    'final_size': R[-1] / modified_params.N,
-                    'min_network_degree': np.min(k_avg),
-                    'max_network_degree': np.max(k_avg),
-                    'avg_clustering': np.mean(C)
-                }
-                
-                results.append(metrics)
-                
-            except Exception as e:
-                print(f"Simulation {i} failed: {e}")
-                continue
+            result = self._run_simulation(modified_params, T_scenario)
+            if result is not None:
+                results.append(result)
         
         if len(results) < n_samples // 2:
             print("⚠️  Insufficient successful simulations for uncertainty analysis")
@@ -354,6 +358,10 @@ class SensitivityAnalysis:
         Returns:
             Dict with Morris screening results
         """
+        # Ensure n_samples is an integer
+        n_samples = int(n_samples)
+        n_groups = int(n_groups)
+        
         if parameter_ranges is None:
             parameter_ranges = {
                 'beta_0': (0.1, 0.5),
@@ -361,92 +369,126 @@ class SensitivityAnalysis:
                 'sigma': (0.1, 0.3),
                 'gamma': (0.1, 0.3),
                 'kappa': (0.1, 0.5),
-                'epsilon': (0.5, 2.0),
-                'sigma_k': (5, 20),
-                'T_critical': (35, 45)
+                'sigma_k': (1, 10),
+                'T_critical': (30, 40)
             }
         
-        param_names = list(parameter_ranges.keys())
+        # Validate parameter ranges
+        valid_params = []
+        for param, (min_val, max_val) in parameter_ranges.items():
+            if hasattr(ModelParameters(), param):
+                valid_params.append(param)
+            else:
+                print(f"Warning: Parameter '{param}' not found in ModelParameters, skipping...")
+        
+        if not valid_params:
+            print("Error: No valid parameters found for Morris screening")
+            return None
+        
+        param_names = valid_params
         n_params = len(param_names)
         
         # Generate Morris trajectories
         delta = 1.0 / (n_groups - 1)
         elementary_effects = {param: [] for param in param_names}
         
-        print(f"Running Morris screening with {n_samples} trajectories...")
+        print(f"Running Morris screening with {n_samples} trajectories for {n_params} parameters...")
         
-        for i in range(min(n_samples, 50)):  # Limit for performance
-            if self.check_timeout():
-                break
+        try:
+            for i in range(min(n_samples, 50)):  # Limit for performance
+                if self.check_timeout():
+                    break
+                    
+                # Generate base point
+                base_point = np.random.random(n_params)
                 
-            # Generate base point
-            base_point = np.random.random(n_params)
-            
-            # Scale to parameter ranges
-            scaled_params = {}
-            for j, param in enumerate(param_names):
-                min_val, max_val = parameter_ranges[param]
-                scaled_params[param] = min_val + base_point[j] * (max_val - min_val)
-            
-            # Calculate base output
-            base_output = self._evaluate_model_with_params(scaled_params)
-            
-            # Calculate elementary effects
-            for j, param in enumerate(param_names):
-                # Perturb parameter
-                perturbed_params = scaled_params.copy()
-                min_val, max_val = parameter_ranges[param]
-                perturbed_params[param] = min(max_val, scaled_params[param] + delta * (max_val - min_val))
+                # Scale to parameter ranges
+                scaled_params = {}
+                for j, param in enumerate(param_names):
+                    min_val, max_val = parameter_ranges[param]
+                    scaled_params[param] = min_val + base_point[j] * (max_val - min_val)
                 
-                # Calculate effect
-                perturbed_output = self._evaluate_model_with_params(perturbed_params)
-                effect = (perturbed_output - base_output) / (delta * (max_val - min_val))
-                elementary_effects[param].append(effect)
-        
-        # Calculate Morris indices
-        morris_indices = {}
-        for param in param_names:
-            effects = np.array(elementary_effects[param])
-            morris_indices[param] = {
-                'mu': np.mean(effects),
-                'mu_star': np.mean(np.abs(effects)),
-                'sigma': np.std(effects)
+                # Calculate base output
+                base_output = self._evaluate_model_with_params(scaled_params)
+                
+                # Skip if base output is invalid
+                if base_output is None or np.isnan(base_output) or np.isinf(base_output):
+                    print(f"Warning: Invalid base output in trajectory {i}, skipping")
+                    continue
+                
+                # Calculate elementary effects
+                for j, param in enumerate(param_names):
+                    # Perturb parameter
+                    perturbed_params = scaled_params.copy()
+                    min_val, max_val = parameter_ranges[param]
+                    perturbed_params[param] = min(max_val, scaled_params[param] + delta * (max_val - min_val))
+                    
+                    # Calculate effect
+                    perturbed_output = self._evaluate_model_with_params(perturbed_params)
+                    
+                    # Skip if perturbed output is invalid
+                    if perturbed_output is None or np.isnan(perturbed_output) or np.isinf(perturbed_output):
+                        print(f"Warning: Invalid perturbed output for {param} in trajectory {i}, skipping")
+                        continue
+                    
+                    effect = (perturbed_output - base_output) / (delta * (max_val - min_val))
+                    elementary_effects[param].append(effect)
+            
+            # Calculate Morris indices
+            morris_indices = {}
+            for param in param_names:
+                effects = np.array(elementary_effects[param])
+                if len(effects) > 0:
+                    morris_indices[param] = {
+                        'mu': float(np.mean(effects)),
+                        'mu_star': float(np.mean(np.abs(effects))),
+                        'sigma': float(np.std(effects))
+                    }
+                else:
+                    morris_indices[param] = {
+                        'mu': 0.0,
+                        'mu_star': 0.0,
+                        'sigma': 0.0
+                    }
+            
+            return {
+                'parameters': param_names,
+                'indices': morris_indices,
+                'n_trajectories': len(elementary_effects[param_names[0]]) if param_names else 0
             }
-        
-        return {
-            'parameters': param_names,
-            'indices': morris_indices,
-            'n_trajectories': len(elementary_effects[param_names[0]])
-        }
+            
+        except Exception as e:
+            print(f"Morris screening error: {e}")
+            return None
     
     def _evaluate_model_with_params(self, param_dict):
         """Helper method to evaluate model with specific parameters"""
-        # Create a copy of current params
-        temp_params = ModelParameters()
-        
-        # Update with new values
-        for param, value in param_dict.items():
-            if hasattr(temp_params, param):
-                setattr(temp_params, param, value)
-        
-        # Run simplified simulation
-        model = CoupledSystemModel(temp_params, n_nodes=100)
-        
-        # Simple epidemic scenario
-        t = np.linspace(0, 30, 30)  # 30 days
-        
-        def T_func(time):
-            time_array = np.atleast_1d(time)
-            result = 25 + 5*np.sin(2*np.pi*time_array/365)
-            return float(result) if np.isscalar(time) else result
-            
-        def H_func(time):
-            if np.isscalar(time):
-                return 0.7
-            else:
-                return 0.7 * np.ones_like(np.atleast_1d(time))
-        
         try:
+            # Create a copy of current params
+            temp_params = ModelParameters()
+            
+            # Update with new values
+            for param, value in param_dict.items():
+                if hasattr(temp_params, param):
+                    setattr(temp_params, param, value)
+            
+            # Run simplified simulation
+            model = CoupledSystemModel(temp_params, n_nodes=100)
+            
+            # Simple epidemic scenario
+            t = np.linspace(0, 30, 30)  # 30 days
+            
+            def T_func(time):
+                time_array = np.atleast_1d(time)
+                result = 25 + 5*np.sin(2*np.pi*time_array/365)
+                return float(result) if np.isscalar(time) else result
+                
+            def H_func(time):
+                if np.isscalar(time):
+                    return 0.7
+                else:
+                    return 0.7 * np.ones_like(np.atleast_1d(time))
+            
             # Set initial conditions
             S0 = temp_params.N - 100  # Start with 100 infected
             I0 = 100
@@ -464,9 +506,67 @@ class SensitivityAnalysis:
                 t_eval=t
             )
             
+            # Check if states is valid
+            if states is None or len(states.shape) < 2:
+                print(f"Warning: Invalid states returned from solve_coupled_system")
+                return None
+            
             # Return peak infection as output metric
-            return np.max(states[1, :])
+            # states has shape (n_variables, n_time_points) where variables are [S, E, I, R, k_avg, C]
+            # So I (infections) is at index 2
+            peak_infections = float(np.max(states[2, :]))
+            
+            # Check for invalid values
+            if np.isnan(peak_infections) or np.isinf(peak_infections):
+                print(f"Warning: Invalid peak infections value: {peak_infections}")
+                return None
+                
+            return peak_infections
+            
         except Exception as e:
             # Log the error for debugging
             print(f"Model evaluation error: {e}")
-            return 0.0
+            return None
+
+    def validate_parameter_ranges(self, param_ranges):
+        """Validate parameter ranges to ensure they are reasonable"""
+        validated_ranges = {}
+        base_params = ModelParameters()
+        
+        for param_name, (low, high) in param_ranges.items():
+            if not hasattr(base_params, param_name):
+                print(f"Warning: Parameter '{param_name}' not found in ModelParameters, skipping")
+                continue
+                
+            base_value = getattr(base_params, param_name)
+            
+            # Ensure ranges are reasonable
+            if low < 0 and base_value > 0:
+                print(f"Warning: Negative range for {param_name}, adjusting to 0.1")
+                low = 0.1
+            elif low < 0 and base_value < 0:
+                print(f"Warning: Negative range for {param_name}, adjusting to -abs(base_value)")
+                low = -abs(base_value)
+            
+            if high <= low:
+                print(f"Warning: Invalid range for {param_name} ({low}, {high}), using (0.5, 2.0)")
+                low, high = 0.5, 2.0
+            
+            validated_ranges[param_name] = (low, high)
+        
+        return validated_ranges
+    
+    def adaptive_sampling(self, initial_n_samples, min_samples=64, max_samples=2048):
+        """Adaptively adjust sample size based on convergence"""
+        n_samples = initial_n_samples
+        
+        # Start with minimum samples
+        if n_samples < min_samples:
+            n_samples = min_samples
+        elif n_samples > max_samples:
+            n_samples = max_samples
+        
+        # Round to power of 2
+        n_samples = self.round_to_power_of_2(n_samples)
+        
+        return n_samples
