@@ -1,144 +1,285 @@
-# Urban Climate Resilience Analysis
+# Urban Climate-Social Network Resilience System
 
-A comprehensive mathematical modeling framework for analyzing coupled climate-epidemic-network dynamics in urban environments.
+[![Climate Analysis](https://github.com/skckenneth/urban_climate_resilience/actions/workflows/climate_analysis.yml/badge.svg)](https://github.com/skckenneth/urban_climate_resilience/actions/workflows/climate_analysis.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-## Overview
+A comprehensive mathematical modeling framework for analyzing coupled climate-epidemic-social network dynamics in urban environments. This system provides advanced tools for understanding how climate change impacts disease spread through dynamic social networks and optimal resource allocation strategies.
 
-This project implements sophisticated mathematical models to study:
-- Climate-forced epidemiological dynamics (modified SEIR model)
-- Dynamic social network evolution under climate stress
-- Coupled system behavior with feedback loops
-- Optimal control strategies for resource allocation
-- Stability and bifurcation analysis
-- Comprehensive sensitivity analysis
+## 🌟 Key Features
 
-## Installation
+### 🧮 Mathematical Models
+- **Climate-Forced SEIR Model**: Epidemiological dynamics with temperature/humidity dependencies
+- **Dynamic Network Evolution**: Social connectivity that responds to climate stress
+- **Coupled System Dynamics**: Bidirectional feedback between epidemic and network states
+- **Optimal Control Theory**: Resource allocation strategies for disease mitigation
 
-### Local Setup
+### 📊 Advanced Analysis Capabilities
+- **Stability Analysis**: Eigenvalue analysis and equilibrium characterization
+- **Bifurcation Analysis**: Critical temperature thresholds identification
+- **Sensitivity Analysis**: Morris screening and Sobol variance-based methods
+- **Control Optimization**: Pontryagin's maximum principle for optimal strategies
+
+### 🚀 Automated Workflows
+- **GitHub Actions Integration**: Cloud-based analysis execution
+- **Parallel Processing**: Multi-scenario efficient computation
+- **Comprehensive Visualization**: Publication-ready figures generation
+- **Flexible Configuration**: Quick testing and full research modes
+
+## 📈 Example Results
+
+The system generates comprehensive visualizations across multiple analysis dimensions:
+
+### Epidemic Dynamics Comparison
+![Epidemic Dynamics](figures/epidemic_dynamics_baseline.png)
+*Comparison of SEIR dynamics under different climate scenarios*
+
+### Stability and Bifurcation Analysis
+![Bifurcation Analysis](figures/bifurcation_diagram.png)
+*Temperature-driven bifurcation points in system stability*
+
+### Sensitivity Analysis
+![Sensitivity Analysis](figures/sensitivity_analysis.png)
+*Parameter importance ranking using Morris and Sobol methods*
+
+## 🚀 Quick Start
+
+### Installation
+
 ```bash
-git clone https://github.com/yourusername/urban_climate_resilience.git
+# Clone the repository
+git clone https://github.com/skckenneth/urban_climate_resilience.git
 cd urban_climate_resilience
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Or install as package (recommended)
+pip install -e .
 ```
 
-### Requirements
-- Python 3.10+
-- NumPy, SciPy, Matplotlib
-- NetworkX, Pandas, Seaborn
-- scikit-learn, joblib, psutil
+### Running Your First Analysis
 
-## Running Analyses
-
-### Quick Analysis (Testing)
 ```bash
-# Run baseline scenario (90 days, 5000 population)
+# Quick test run (90 days, 5000 population)
 python main.py --quick-mode
 
-# Run specific scenario
+# Run specific climate scenario
 python main.py --analysis-type heatwave --quick-mode
-```
 
-### Full Paper Analysis (Local)
-```bash
-# Run complete analysis for paper (365 days, 10000 population)
+# Full research analysis (365 days, comprehensive outputs)
 python run_full_analysis.py
-
-# Results will be in paper_results/ directory
 ```
 
-## GitHub Actions - Automated Analysis
+## 🔬 Analysis Modes
 
-### Running Quick Analysis (Default)
-1. Go to **Actions** tab in GitHub
-2. Select **Climate Analysis** workflow
-3. Click **Run workflow**
-4. Keep default settings:
-   - Analysis mode: `quick`
-   - Scenario type: `baseline`
-5. Click **Run workflow** button
+### 1. Quick Mode (Testing & Development)
+Perfect for rapid iteration and testing:
+- **Duration**: 90 days simulation
+- **Population**: 5,000 individuals
+- **Runtime**: ~2-5 minutes
+- **Outputs**: Basic epidemic curves and summary statistics
 
-### Running Full Paper Analysis
-1. Go to **Actions** tab
-2. Select **Climate Analysis** workflow  
-3. Click **Run workflow**
-4. Change settings:
-   - Analysis mode: **`paper`** (IMPORTANT!)
-5. Click **Run workflow** button
-6. Wait ~30-60 minutes for completion
+```bash
+python main.py --quick-mode --analysis-type baseline
+```
 
-### What Gets Generated
+### 2. Paper Mode (Research & Publication)
+Comprehensive analysis for research purposes:
+- **Duration**: 365 days simulation
+- **Population**: 10,000+ individuals
+- **Runtime**: ~30-60 minutes
+- **Outputs**: Complete analysis suite with all visualizations
 
-#### Quick Mode:
+```bash
+python run_full_analysis.py
+```
+
+## ☁️ GitHub Actions - Cloud Analysis
+
+### Running Analysis in the Cloud
+
+1. **Navigate to Actions Tab**
+   - Go to your repository on GitHub
+   - Click the "Actions" tab
+
+2. **Select Climate Analysis Workflow**
+   - Click on "Climate Analysis" workflow
+   - Click "Run workflow" button
+
+3. **Configure Analysis**
+   - **Analysis Mode**: 
+     - `quick`: Fast testing (5 min runtime)
+     - `paper`: Full research analysis (60 min runtime)
+   - **Scenario Type**: `baseline`, `heatwave`, or `extreme`
+
+4. **Download Results**
+   - After completion, scroll to "Artifacts" section
+   - Download `analysis-results-{run-number}.zip`
+   - Extract to access all generated figures and data
+
+### Generated Outputs
+
+#### Quick Mode Results
 - `{scenario}_epidemic.png` - Epidemic dynamics visualization
-- `{scenario}_data.npz` - Simulation data
-- `{scenario}_summary.txt` - Summary statistics
+- `{scenario}_data.npz` - Simulation data arrays
+- `{scenario}_summary.txt` - Key statistics summary
 
-#### Paper Mode (Full Analysis):
-- **Epidemic Dynamics**: 
-  - `baseline_epidemic_dynamics.png`
-  - `heatwave_epidemic_dynamics.png`
-  - `extreme_epidemic_dynamics.png`
-- **Stability Analysis**:
-  - `stability_analysis.png` - Eigenvalue analysis
-  - `bifurcation_diagram.png` - Temperature bifurcation
-- **Sensitivity Analysis**:
-  - `morris_sensitivity.png` - Morris screening results
-  - `sobol_sensitivity.png` - Sobol indices heatmap
-- **Comparison & Phase Portraits**:
-  - `scenario_comparison.png` - All scenarios comparison
-  - `phase_portrait_I_k.png` - Infected vs connectivity
-  - `phase_portrait_I_C.png` - Infected vs clustering
-- **Optimal Control**:
-  - `optimal_control_strategies.png` - Control inputs over time
-  - `controlled_vs_uncontrolled.png` - Impact comparison
-- **Data & Reports**:
-  - `{scenario}_results.npz` - Full simulation data
-  - `paper_analysis_summary.txt` - Complete summary
+#### Paper Mode Results (Complete Suite)
+- **📊 Epidemic Dynamics**: Baseline, heatwave, and extreme scenario comparisons
+- **🔍 Stability Analysis**: Eigenvalue analysis and equilibrium characterization
+- **📈 Bifurcation Analysis**: Temperature-driven system transitions
+- **🎯 Sensitivity Analysis**: Morris screening and Sobol variance decomposition
+- **🎮 Control Analysis**: Optimal resource allocation strategies
+- **🌐 Phase Portraits**: System state space visualization
+- **📝 Comprehensive Reports**: Detailed statistical summaries
 
-### Downloading Results
-
-1. After workflow completes, click on the run
-2. Scroll to **Artifacts** section
-3. Download `analysis-results-{number}.zip`
-4. Extract to get all figures and data
-
-## Project Structure
+## 🏗️ Project Architecture
 
 ```
 urban_climate_resilience/
-├── models/                 # Mathematical models
-│   ├── coupled_system.py   # Main coupled dynamics
-│   ├── epidemiological_model.py  # SEIR with climate
-│   ├── network_model.py    # Dynamic networks
-│   └── optimal_control.py  # Control strategies
-├── analysis/              # Analysis modules
-│   ├── stability_analysis.py
-│   ├── sensitivity_analysis.py
-│   └── control_analysis.py
-├── utils/                 # Utilities
-│   ├── parameters.py      # Model parameters
-│   ├── visualization.py   # Plotting functions
-│   └── data_generator.py  # Climate scenarios
-├── main.py               # Quick analysis entry
-├── run_full_analysis.py  # Full paper analysis
-└── .github/workflows/    # GitHub Actions
-
+├── 📁 models/                    # Core mathematical models
+│   ├── coupled_system.py         # Main coupled dynamics implementation
+│   ├── epidemiological_model.py  # Climate-forced SEIR model
+│   ├── network_model.py          # Dynamic social network evolution
+│   └── optimal_control.py        # Control theory implementation
+├── 📁 analysis/                  # Advanced analysis modules
+│   ├── stability_analysis.py     # Eigenvalue & equilibrium analysis
+│   ├── sensitivity_analysis.py   # Morris & Sobol methods
+│   └── control_analysis.py       # Optimal control strategies
+├── 📁 utils/                     # Utility functions
+│   ├── parameters.py             # Model parameter definitions
+│   ├── visualization.py          # Publication-quality plotting
+│   ├── data_generator.py         # Climate scenario generation
+│   └── gallery_generator.py      # Figure gallery creation
+├── 📁 .github/workflows/         # CI/CD automation
+│   └── climate_analysis.yml      # GitHub Actions workflow
+├── main.py                       # Quick analysis entry point
+├── run_full_analysis.py          # Comprehensive research analysis
+├── parallel_analysis.py          # Multi-scenario parallel processing
+└── setup.py                      # Package configuration
 ```
 
-## Workflow Status
+## 🔧 Configuration
 
-[![Climate Analysis](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/climate_analysis.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/climate_analysis.yml)
+### Model Parameters
 
-## Citation
+Key parameters can be configured in `utils/parameters.py`:
 
-If you use this code in your research, please cite:
+```python
+# Population and network parameters
+N = 10000              # Total population size
+k_mean = 8.0          # Average network connectivity
+gamma = 3.0           # Network clustering parameter
+
+# Epidemiological parameters
+beta_base = 0.3       # Base transmission rate
+alpha = 0.02          # Climate sensitivity parameter
+sigma = 1/5.2         # Incubation rate (1/days)
+gamma_epi = 1/10      # Recovery rate (1/days)
+
+# Climate scenarios
+temp_amplitude = 5.0   # Temperature variation amplitude
+humidity_base = 0.6   # Baseline relative humidity
 ```
-[Your Paper Title]
-[Authors]
-[Journal/Conference] [Year]
+
+### Scenario Types
+
+1. **Baseline**: Normal climate conditions with seasonal variation
+2. **Heatwave**: Extended high-temperature periods with reduced humidity
+3. **Extreme**: Severe climate conditions with high variability
+
+## 📊 Understanding the Outputs
+
+### Epidemic Dynamics Plots
+- **Susceptible (S)**: Population at risk
+- **Exposed (E)**: Recently infected, not yet infectious
+- **Infected (I)**: Currently infectious individuals
+- **Recovered (R)**: Immune or removed from population
+
+### Network Metrics
+- **Average Connectivity**: Mean number of social connections
+- **Clustering Coefficient**: Local network density measure
+- **Rewiring Rate**: Network adaptation speed to climate stress
+
+### Stability Metrics
+- **Eigenvalues**: System stability indicators
+- **Equilibrium Points**: Long-term system states
+- **Bifurcation Points**: Critical parameter thresholds
+
+## 🔬 Research Applications
+
+This framework enables investigation of:
+
+1. **Climate-Health Interactions**: How temperature and humidity affect disease transmission
+2. **Social Network Resilience**: Community adaptation to environmental stress
+3. **Intervention Strategies**: Optimal timing and allocation of public health resources
+4. **Tipping Points**: Critical climate thresholds for epidemic outbreaks
+5. **Policy Analysis**: Comparative effectiveness of different intervention approaches
+
+## 📚 Technical Background
+
+### Mathematical Framework
+
+The system implements a coupled differential equation model:
+
+```
+dS/dt = -β(T,H) * S * I / N - μS + μN
+dE/dt = β(T,H) * S * I / N - σE - μE  
+dI/dt = σE - γI - μI
+dR/dt = γI - μR
+
+dk/dt = α_k * f(T,H) * (k_target - k)
+dC/dt = α_C * g(T,H) * (C_target - C)
 ```
 
-## License
+Where:
+- `β(T,H)` is climate-dependent transmission rate
+- `k` is average network connectivity  
+- `C` is clustering coefficient
+- `T,H` are temperature and humidity forcing
 
-MIT License - see LICENSE file for details.
+### Sensitivity Analysis Methods
+
+1. **Morris Screening**: Efficient identification of influential parameters
+2. **Sobol Indices**: Variance-based sensitivity quantification
+3. **Parameter Ranking**: Importance hierarchy for model understanding
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our contributing guidelines:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 📖 Citation
+
+If you use this framework in your research, please cite:
+
+```bibtex
+@software{cheng2024urban_climate_resilience,
+  author = {Cheng, Kenneth Sok Kin},
+  title = {Urban Climate-Social Network Resilience System},
+  year = {2024},
+  publisher = {GitHub},
+  url = {https://github.com/skckenneth/urban_climate_resilience}
+}
+```
+
+## 📞 Contact
+
+**Kenneth Sok Kin Cheng**  
+📧 Email: sokkincheng@gmail.com  
+🔗 GitHub: [@skckenneth](https://github.com/skckenneth)
+
+---
+
+*Built with ❤️ for climate resilience research*
 
