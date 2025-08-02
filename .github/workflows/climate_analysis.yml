@@ -10,11 +10,11 @@ on:
       analysis_mode:
         description: 'Analysis mode'
         required: true
-        default: 'quick'
+        default: 'paper'
         type: choice
         options:
-          - quick
           - paper
+          - quick
       analysis_type:
         description: 'Scenario type (for quick mode)'
         required: false
@@ -74,8 +74,8 @@ jobs:
         MPLBACKEND: Agg
         OMP_NUM_THREADS: 2
       run: |
-        # Use workflow inputs or defaults
-        MODE="${{ github.event.inputs.analysis_mode || 'quick' }}"
+        # Use workflow inputs or defaults - now defaulting to 'paper' (full analysis)
+        MODE="${{ github.event.inputs.analysis_mode || 'paper' }}"
         TYPE="${{ github.event.inputs.analysis_type || 'baseline' }}"
         
         echo "Analysis mode: $MODE"
@@ -92,26 +92,21 @@ jobs:
       if: always()
       run: |
         echo "=== Results ==="
-        if [ "${{ github.event.inputs.analysis_mode }}" = "paper" ]; then
-          if [ -d paper_results ]; then
-            echo "Paper results directory:"
-            ls -la paper_results/
-            echo ""
-            echo "PNG files generated:"
-            find paper_results -name "*.png" -type f | sort
-            echo ""
-            echo "Data files generated:"
-            find paper_results -name "*.npz" -type f | sort
-          else
-            echo "No paper_results directory found"
-          fi
+        # Check for paper results first since it's now the default
+        if [ -d paper_results ]; then
+          echo "Paper results directory:"
+          ls -la paper_results/
+          echo ""
+          echo "PNG files generated:"
+          find paper_results -name "*.png" -type f | sort
+          echo ""
+          echo "Data files generated:"
+          find paper_results -name "*.npz" -type f | sort
+        elif [ -d results ]; then
+          echo "Quick results directory:"
+          ls -la results/
         else
-          if [ -d results ]; then
-            echo "Quick results directory:"
-            ls -la results/
-          else
-            echo "No results directory found"
-          fi
+          echo "No results directory found"
         fi
     
     - name: Upload results
@@ -127,7 +122,7 @@ jobs:
     - name: Create summary
       if: always()
       run: |
-        MODE="${{ github.event.inputs.analysis_mode || 'quick' }}"
+        MODE="${{ github.event.inputs.analysis_mode || 'paper' }}"
         
         echo "## Analysis Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY

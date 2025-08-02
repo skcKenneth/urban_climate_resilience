@@ -174,7 +174,7 @@ def run_full_analysis_for_paper(output_dir='results'):
     try:
         eq_analysis = stability.stability_analysis(final_state, final_T, final_H)
         print(f"Eigenvalues: {eq_analysis['eigenvalues']}")
-        print(f"System stable: {eq_analysis['stable']}")
+        print(f"System stability: {eq_analysis['stability']}")
         
         # Plot stability
         fig = viz.plot_stability_analysis(eq_analysis)
@@ -284,38 +284,44 @@ def run_full_analysis_for_paper(output_dir='results'):
     print("="*60)
     
     try:
-        control = ControlAnalysis(baseline_results['params'])
+        control = ControlAnalysis(baseline_results['params'], results_dir=output_dir)
         
+        print("Running control strategy comparison...")
         # Run control comparison which exists in the ControlAnalysis class
         control_results = control.run_control_comparison(
             t_span=(0, 180),  # 6 months
             quick_mode=True
         )
+        print("Control analysis completed successfully!")
         
         if control_results:
-            # Plot whatever control results we got
-            if 'trajectories' in control_results:
+            results, summary = control_results
+            # Plot additional control results if needed
+            if 'optimal' in results and 'baseline' in results:
                 # Create a simple plot of the control results
                 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
                 
-                # Plot epidemic curves
-                for strategy, data in control_results['trajectories'].items():
-                    if 'I' in data:
-                        ax1.plot(data['t'], data['I'], label=strategy)
+                # Plot epidemic curves for different strategies
+                for strategy, data in results.items():
+                    if 'y' in data and data['y'] is not None:
+                        # data['y'] has shape (6, time_points) where row 1 is I
+                        ax1.plot(data['y'][1, :], label=strategy.capitalize())
                 
                 ax1.set_xlabel('Time (days)')
-                ax1.set_ylabel('Infected')
-                ax1.set_title('Control Strategy Comparison')
+                ax1.set_ylabel('Infected Population')
+                ax1.set_title('Control Strategy Comparison - Infections')
                 ax1.legend()
                 ax1.grid(True, alpha=0.3)
                 
                 # Plot network metrics if available
-                for strategy, data in control_results['trajectories'].items():
-                    if 'k_avg' in data:
-                        ax2.plot(data['t'], data['k_avg'], label=strategy)
+                for strategy, data in results.items():
+                    if 'y' in data and data['y'] is not None:
+                        # data['y'] has shape (6, time_points) where row 4 is k_avg
+                        ax2.plot(data['y'][4, :], label=strategy.capitalize())
                 
                 ax2.set_xlabel('Time (days)')
-                ax2.set_ylabel('Average Degree')
+                ax2.set_ylabel('Average Network Degree')
+                ax2.set_title('Control Strategy Comparison - Network')
                 ax2.legend()
                 ax2.grid(True, alpha=0.3)
                 
