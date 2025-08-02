@@ -245,39 +245,10 @@ Where:
 2. **Sobol Indices**: Variance-based sensitivity quantification
 3. **Parameter Ranking**: Importance hierarchy for model understanding
 
-## 🤝 Contributing
-
-We welcome contributions! Please see our contributing guidelines:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 📖 Citation
-
-If you use this framework in your research, please cite:
-
-```bibtex
-@software{cheng2024urban_climate_resilience,
-  author = {Cheng, Kenneth Sok Kin},
-  title = {Urban Climate-Social Network Resilience System},
-  year = {2024},
-  publisher = {GitHub},
-  url = {https://github.com/skckenneth/urban_climate_resilience}
-}
-```
-
-## 📞 Contact
-
-**Kenneth Sok Kin Cheng**  
-📧 Email: sokkincheng@gmail.com  
-🔗 GitHub: [@skckenneth](https://github.com/skckenneth)
 
 ---
 
